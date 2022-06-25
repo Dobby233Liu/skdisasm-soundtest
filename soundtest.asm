@@ -6,7 +6,7 @@
 		org 0
 ; ---------------------------------------------------------------------------
 
-strip_padding = 1
+add_padding = 0
 Size_of_Snd_driver_guess = $1200
 mus_Default	= $01
 V_int_executing = V_int_routine
@@ -63,8 +63,6 @@ KiS2ROMEndLoc:		tribyte $33FFFF
 KiS2ROMStartLoc2:	tribyte $300000
 KiS2ROMEndLoc2:		tribyte $33FFFF
 Country_Code:	dc.b "JUE             "
-; ---------------------------------------------------------------------------
-
 ; ---------------------------------------------------------------------------
 SetupValues:	dc.w $8000,bytesToLcnt($10000),$100
 		dc.l Z80_RAM
@@ -147,6 +145,26 @@ Z80StartupCodeEnd:
 		dc.l vdpComm($0000,VSRAM,WRITE)	; value for VSRAM write mode
 PSGInitValues:	dc.b $9F,$BF,$DF,$FF		; values for PSG channel volumes
 PSGInitValues_End:
+VDP_register_values:
+		dc.w $8004	; H-int disabled
+		dc.w $8134	; V-int enabled, display blanked, DMA enabled, 224 line display
+		dc.w $8230	; Scroll A PNT base $C000
+		dc.w $8320	; Window PNT base $8000
+		dc.w $8407	; Scroll B PNT base $E000
+		dc.w $857C	; Sprite attribute table base $F800
+		dc.w $8600
+		dc.w $8700	; Backdrop color is color 0 of the first palette line
+		dc.w $8800
+		dc.w $8900
+		dc.w $8A00
+		dc.w $8B00	; Full-screen horizontal and vertical scrolling
+		dc.w $8C81	; 40 cell wide display, no interlace
+		dc.w $8D3C	; Horizontal scroll table base $F000
+		dc.w $8E00
+		dc.w $8F02	; Auto-ncrement is 2
+		dc.w $9001	; Scroll planes are 64x32 cells
+		dc.w $9100
+		dc.w $9200	; Window disabled
 ; ---------------------------------------------------------------------------
 
 ; Trap for real unlike in SK
@@ -249,30 +267,6 @@ EntryPoint:
 
 GameStartup:
 
-; Count cycles between VBlanks (likely to detect PAL systems and/or for other timing mechanisms
-DetectPAL:
-		lea	(VDP_control_port).l,a5
-		move.w	#$8174,(a5)		; VDP Command $8174 - Display on, VInt on, DMA on, PAL off
-		moveq	#0,d0
-
-	.waitForVBlankStart:
-		move.w	(a5),d1
-		andi.w	#8,d1
-		beq.s	.waitForVBlankStart
-
-	.waitForVBlankEnd:
-		move.w	(a5),d1
-		andi.w	#8,d1
-		bne.s	.waitForVBlankEnd	; Wait for VBlank to run once
-
-	.waitForNextVBlank:
-		addq.w	#1,d0
-		move.w	(a5),d1
-		andi.w	#8,d1
-		beq.s	.waitForNextVBlank
-		move.w	d0,(V_blank_cycles).w
-; End of function DetectPAL
-
 Init_VDP:
 		lea	(VDP_control_port).l,a0
 		lea	(VDP_data_port).l,a1
@@ -334,24 +328,19 @@ SndDrvInit:
 		startZ80
 ; End of function SndDrvInit
 
-
+GameInitTrue:
 	; delay moment
-	;	move.w	#$ffff,d0
-	;.wait1:
-	;	bsr.w	Wait_VSync
-	;	dbf	d0,.wait1
-	;
-	;	move.w	#$ffff,d0
-	;.wait2:
-	;	bsr.w	Wait_VSync
-	;	dbf	d0,.wait2
+		move.w	#$40,d0
+	.wait1:
+		bsr.w	Wait_VSync
+		dbf	d0,.wait1
 
 		move.w	#signextendB(mus_Default),d0
 		bsr.w	Play_Music
 
 GameLoop:
-		bsr.w	Wait_VSync
 		bra.s	GameLoop
+
 ; ---------------------------------------------------------------------------
 
 ; ---------------------------------------------------------------------------
@@ -375,54 +364,17 @@ Wait_VSync:
 ; ---------------------------------------------------------------------------
 
 VInt:
-		nop
 		movem.l	d0-a6,-(sp)
 -
 		move.w	(VDP_control_port).l,d0
 		andi.w	#8,d0
 		beq.s	-	; wait until vertical blanking is taking place
-
-		btst	#6,(Graphics_flags).w
-		beq.s	+	; branch if it's not a PAL system
-		move.w	#$700,d0
--
-		dbf	d0,-	; otherwise, waste a bit of time here
-+
-		btst	#6,(Graphics_flags).w
-		beq.s	+	; branch if it isn't a PAL system
-		move.w	#$700,d0
--
-		dbf	d0,-	; otherwise, waste a bit of time here
-+
 		move.b	#0,(V_int_executing).w
-		startZ80
 		movem.l	(sp)+,d0-a6
 		rte
 
 HInt:
 		rte
-
-; ---------------------------------------------------------------------------
-VDP_register_values:
-		dc.w $8004	; H-int disabled
-		dc.w $8134	; V-int enabled, display blanked, DMA enabled, 224 line display
-		dc.w $8230	; Scroll A PNT base $C000
-		dc.w $8320	; Window PNT base $8000
-		dc.w $8407	; Scroll B PNT base $E000
-		dc.w $857C	; Sprite attribute table base $F800
-		dc.w $8600
-		dc.w $8700	; Backdrop color is color 0 of the first palette line
-		dc.w $8800
-		dc.w $8900
-		dc.w $8A00
-		dc.w $8B00	; Full-screen horizontal and vertical scrolling
-		dc.w $8C81	; 40 cell wide display, no interlace
-		dc.w $8D3C	; Horizontal scroll table base $F000
-		dc.w $8E00
-		dc.w $8F02	; Auto-ncrement is 2
-		dc.w $9001	; Scroll planes are 64x32 cells
-		dc.w $9100
-		dc.w $9200	; Window disabled
 
 ; ---------------------------------------------------------------------------
 ; Always replaces an index previous passed to this function
@@ -474,9 +426,11 @@ Change_Music_Tempo:
 		rts
 ; End of function Change_Music_Tempo
 
-; ||||||||||||||| S U B R O U T I N E |||||||||||||||||||||||||||||||||||||||
 ; ---------------------------------------------------------------------------
-; Kosinski decompression subroutine that decompresses data instantly
+; |||||||||||||||||||||| S U B R O U T I N E ||||||||||||||||||||||||||||||||
+; ---------------------------------------------------------------------------
+; Kosinski decompression subroutine that decompresses data right when
+; it's run
 ;
 ; For format explanation see http://info.sonicretro.org/Kosinski_compression
 ; New faster version by written by vladikcomper, with additional improvements by
@@ -708,7 +662,7 @@ KosDec_ByteMap:
 ; ---------------------------------------------------------------------------
 
 	; End-of-ROM padding stuff
-	if ~~strip_padding
+	if add_padding
 	if (*)&(*-1)
 		cnop -1,2<<lastbit(*)
 		dc.b $FF ; AS would automatically strip this padding if we didn't specifically declare one byte at the end

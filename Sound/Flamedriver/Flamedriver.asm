@@ -37,6 +37,8 @@ use_s3_samples			= 1
 ; Set the following to non-zero to use all S&K DAC samples,
 ; or to zero otherwise.
 use_sk_samples			= 1
+; special
+s3_dac_no_voice_samples	= 1
 
 ; ---------------------------------------------------------------------------
 
@@ -4903,18 +4905,32 @@ DAC_9E_Data:			DACBINCLUDE "Sound/DAC/9E.bin"
 	endif
 
 	if (use_s3_samples<>0)||(use_sk_samples<>0)
-DAC_9F_Data:			DACBINCLUDE "Sound/DAC/9F.bin"
-DAC_A0_Data:			DACBINCLUDE "Sound/DAC/A0.bin"
+	if (s3_dac_no_voice_samples<>0)
+	DAC_9F_Data:		DACBINCLUDE "Sound/DAC/empty.bin"
+	DAC_A0_Data:		DACBINCLUDE "Sound/DAC/empty.bin"
+	else
+	DAC_9F_Data:		DACBINCLUDE "Sound/DAC/9F.bin"
+	DAC_A0_Data:		DACBINCLUDE "Sound/DAC/A0.bin"
+	endif
 DAC_A1_Data:			DACBINCLUDE "Sound/DAC/A1.bin"
 DAC_A2_Data:			DACBINCLUDE "Sound/DAC/A2.bin"
 DAC_A3_Data:			DACBINCLUDE "Sound/DAC/A3.bin"
 DAC_A4_Data:			DACBINCLUDE "Sound/DAC/A4.bin"
-DAC_A5_Data:			DACBINCLUDE "Sound/DAC/A5.bin"
+	if (s3_dac_no_voice_samples<>0)
+	DAC_A5_Data:		DACBINCLUDE "Sound/DAC/empty.bin"
+	else
+	DAC_A5_Data:		DACBINCLUDE "Sound/DAC/A5.bin"
+	endif
 DAC_A6_Data:			DACBINCLUDE "Sound/DAC/A6.bin"
 DAC_A7_Data:			DACBINCLUDE "Sound/DAC/A7.bin"
 DAC_A8_Data:			DACBINCLUDE "Sound/DAC/A8.bin"
-DAC_A9_Data:			DACBINCLUDE "Sound/DAC/A9.bin"
-DAC_AA_Data:			DACBINCLUDE "Sound/DAC/AA.bin"
+	if (s3_dac_no_voice_samples<>0)
+	DAC_A9_Data:		DACBINCLUDE "Sound/DAC/empty.bin"
+	DAC_AA_Data:		DACBINCLUDE "Sound/DAC/empty.bin"
+	else
+	DAC_A9_Data:		DACBINCLUDE "Sound/DAC/A9.bin"
+	DAC_AA_Data:		DACBINCLUDE "Sound/DAC/AA.bin"
+	endif
 
 	finishBank
 
@@ -4924,21 +4940,33 @@ DAC_AA_Data:			DACBINCLUDE "Sound/DAC/AA.bin"
 DacBank3:			startBank
 	DAC_Master_Table
 
-DAC_AB_Data:			DACBINCLUDE "Sound/DAC/AB.bin"
+	if (s3_dac_no_voice_samples<>0)
+	DAC_AB_Data:		DACBINCLUDE "Sound/DAC/94-97.bin"
+	else
+	DAC_AB_Data:		DACBINCLUDE "Sound/DAC/AB.bin"
+	endif
 DAC_AC_Data:			DACBINCLUDE "Sound/DAC/AC.bin"
 DAC_AD_AE_Data:			DACBINCLUDE "Sound/DAC/AD-AE.bin"
 DAC_AF_B0_Data:			DACBINCLUDE "Sound/DAC/AF-B0.bin"
 DAC_B1_Data:			DACBINCLUDE "Sound/DAC/B1.bin"
 DAC_B4_C1_C2_C3_C4_Data:DACBINCLUDE "Sound/DAC/B4C1-C4.bin"
 DAC_B5_Data:			DACBINCLUDE "Sound/DAC/B5.bin"
-DAC_B6_Data:			DACBINCLUDE "Sound/DAC/B6.bin"
+	if (s3_dac_no_voice_samples<>0)
+	DAC_B6_Data:		DACBINCLUDE "Sound/DAC/A8.bin" ; best replacement ive found
+	else
+	DAC_B6_Data:		DACBINCLUDE "Sound/DAC/B6.bin"
+	endif
 DAC_B7_Data:			DACBINCLUDE "Sound/DAC/B7.bin"
 DAC_B8_B9_Data:			DACBINCLUDE "Sound/DAC/B8-B9.bin"
 DAC_BA_Data:			DACBINCLUDE "Sound/DAC/BA.bin"
 DAC_BB_Data:			DACBINCLUDE "Sound/DAC/BB.bin"
 DAC_BC_Data:			DACBINCLUDE "Sound/DAC/BC.bin"
 DAC_BD_Data:			DACBINCLUDE "Sound/DAC/BD.bin"
-DAC_BE_Data:			DACBINCLUDE "Sound/DAC/BE.bin"
+	if (s3_dac_no_voice_samples<>0)
+	DAC_BE_Data:		DACBINCLUDE "Sound/DAC/A2.bin"
+	else
+	DAC_BE_Data:		DACBINCLUDE "Sound/DAC/BE.bin"
+	endif
 DAC_BF_Data:			DACBINCLUDE "Sound/DAC/BF.bin"
 DAC_C0_Data:			DACBINCLUDE "Sound/DAC/C0.bin"
 
