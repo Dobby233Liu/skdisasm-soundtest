@@ -16,41 +16,16 @@ s3p21_Header:
 
 ; DAC Data
 Snd_SSZ_DAC:
-	smpsPan             panCenter, $00
-	dc.b	nRst, $60, nRst, nRst, nRst, $17, nRst, $0C, dSnareS3, nRst, dSnareS3, nRst
-	dc.b	dKickS3, $06, dKickS3
-
-Snd_SSZ_Loop00:
-	smpsPan             panCenter, $00
-	dc.b	dKickS3, $05, dKickS3, dKickS3, $0E, nRst, $0C, dMuffledSnare, $05, dMuffledSnare, dMuffledSnare, $0E
-	dc.b	dMuffledSnare, $0C, nRst, dKickS3, $06, dKickS3, dKickS3, $0C, dKickS3, nRst, dMuffledSnare, $05
-	dc.b	dMuffledSnare, dMuffledSnare, $0E, dMuffledSnare, $0C, nRst, dKickS3, dKickS3, $0C, dKickS3, nRst, dMuffledSnare
-	dc.b	$05, dMuffledSnare, dMuffledSnare, $0E, dMuffledSnare, $0C, nRst, dKickS3, $06, dKickS3, dKickS3, $0C
-	dc.b	dKickS3, nRst, dMuffledSnare, $05, dMuffledSnare, dMuffledSnare, $08
-	smpsPan             panLeft, $00
-	dc.b	dElectricMidTom, $06, dElectricMidTom, dElectricMidTom
-	smpsPan             panCenter, $00
-	dc.b	dElectricLowTom, dElectricLowTom
-	smpsPan             panRight, $00
-	dc.b	dElectricFloorTom, nRst
-	smpsLoop            $00, $08, Snd_SSZ_Loop00
-	dc.b	nRst, $01
-	smpsJump            Snd_SSZ_DAC
+	dc.b	dBassHey
+	smpsStop
 
 ; FM3 Data
 s3p21_FM3:
-	smpsSetvoice        $15
-	smpsDetune          $04
-	smpsModSet          $0F, $01, $FD, $07
-	smpsPan             panLeft, $00
-	smpsJump            s3p21_Jump02
+	smpsStop
 
 ; FM1 Data
 s3p21_FM1:
-	smpsSetvoice        $15
-	smpsDetune          $FC
-	smpsModSet          $0F, $01, $00, $07
-	smpsPan             panCenter, $00
+	smpsStop
 
 s3p21_Jump02:
 	dc.b	nG1, $04, nRst, $08, nG1, $06, nRst, nG1, $24, nG2, nG1, $1C
@@ -82,9 +57,7 @@ s3p21_Jump02:
 
 ; FM2 Data
 s3p21_FM2:
-	smpsFMAlterVol      $08
-	smpsSetvoice        $08
-	smpsJump            s3p21_Jump01
+	smpsStop
 
 s3p21_Jump04:
 	dc.b	nG4, $06, nF4, $04, nRst, $02, nB3, $06, nC4, $04, nRst, $02
@@ -174,16 +147,11 @@ s3p21_Jump04:
 
 ; PSG1 Data
 s3p21_PSG1:
-	smpsPSGvoice        sTone_02
-	smpsDetune          $00
-	dc.b	nRst, $01
-	smpsJump            s3p21_Jump04
+	smpsStop
 
 ; PSG2 Data
 s3p21_PSG2:
-	smpsPSGvoice        sTone_02
-	smpsDetune          $FF
-	smpsJump            s3p21_Jump04
+	smpsStop
 
 s3p21_Jump01:
 	dc.b	nF4, $12, nE4, nC4, $0C, nC5, $12, nB4, $10, nRst, $02, nG4
@@ -328,10 +296,7 @@ s3p21_Jump01:
 
 ; FM4 Data
 s3p21_FM4:
-	smpsSetvoice        $0A
-	smpsDetune          $04
-	smpsModSet          $19, $01, $F9, $06
-	smpsPan             panLeft, $00
+	smpsStop
 
 s3p21_Jump00:
 	dc.b	nC4, $12, nB3, nG3, $0C, nG4, $12, nF4, nE4, $0C, nC4, $10
@@ -370,17 +335,11 @@ s3p21_Jump00:
 
 ; FM5 Data
 s3p21_FM5:
-	dc.b	nRst, $03
-	smpsFMAlterVol      $04
-	smpsSetvoice        $0A
-	smpsDetune          $FC
-	smpsModSet          $19, $01, $07, $06
-	smpsPan             panRight, $00
-	smpsJump            s3p21_Jump00
+	smpsStop
 
 ; PSG3 Data
 s3p21_PSG3:
-	smpsPSGform         $E7
+	smpsStop
 
 s3p21_Jump03:
 	smpsPSGvoice        sTone_01

@@ -12,6 +12,8 @@ sonic3k.lst
 soundtest.bin
 soundtest.gen
 soundtest.prev.bin
+soundtest.lst
+soundtest.[ph]
 Build/s3builtBinaryOutput.txt
 Build/s3builtErrors.txt
 Build/s3builtOutput.txt
