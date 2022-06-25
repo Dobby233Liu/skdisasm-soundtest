@@ -23,20 +23,20 @@
 ; ===========================================================================
 
 ; Used by SMPS2ASM include file.
-SonicDriverVer			= 5
+SonicDriverVer			= 2
 ; Set the following to non-zero to use all S2 DAC samples, or to zero otherwise.
 ; The S1 samples are a subset of this.
 use_s2_samples			= 1
 ; Set the following to non-zero to use all S3D DAC samples, or to zero
 ; otherwise. Most of the S3D samples are also present in S3/S&K, but
 ; there are two samples specific to S3D.
-use_s3d_samples			= 1
+use_s3d_samples			= 0
 ; Set the following to non-zero to use all S3 DAC samples,
 ; or to zero otherwise.
-use_s3_samples			= 1
+use_s3_samples			= 0
 ; Set the following to non-zero to use all S&K DAC samples,
 ; or to zero otherwise.
-use_sk_samples			= 1
+use_sk_samples			= 0
 ; special
 s3_dac_no_voice_samples	= 1
 
