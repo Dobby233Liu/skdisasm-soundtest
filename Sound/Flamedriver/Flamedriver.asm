@@ -4777,7 +4777,11 @@ DACPointers label *
 		DAC_Setup $18,DAC_A8_Data
 		DAC_Setup $0C,DAC_A9_Data
 		DAC_Setup $0A,DAC_AA_Data
+		if (s3_dac_no_voice_samples<>0)
+		DAC_Setup $0A,DAC_AB_Data
+		else
 		DAC_Setup $0D,DAC_AB_Data
+		endif
 		DAC_Setup $06,DAC_AC_Data
 		DAC_Setup $10,DAC_AD_AE_Data
 		DAC_Setup $18,DAC_AD_AE_Data
@@ -4788,7 +4792,11 @@ DACPointers label *
 		DAC_Setup $20,DAC_B2_B3_Data
 		DAC_Setup $0C,DAC_B4_C1_C2_C3_C4_Data
 		DAC_Setup $0C,DAC_B5_Data
+		if (s3_dac_no_voice_samples<>0)
+		DAC_Setup $18,DAC_B6_Data
+		else
 		DAC_Setup $0C,DAC_B6_Data
+		endif
 		DAC_Setup $18,DAC_B7_Data
 		DAC_Setup $0C,DAC_B8_B9_Data
 		DAC_Setup $0C,DAC_B8_B9_Data
@@ -4796,7 +4804,11 @@ DACPointers label *
 		DAC_Setup $18,DAC_BB_Data
 		DAC_Setup $18,DAC_BC_Data
 		DAC_Setup $0C,DAC_BD_Data
+		if (s3_dac_no_voice_samples<>0)
+		DAC_Setup $0A,DAC_BE_Data
+		else
 		DAC_Setup $0C,DAC_BE_Data
+		endif
 		DAC_Setup $1C,DAC_BF_Data
 		DAC_Setup $0B,DAC_C0_Data
 		DAC_Setup $0F,DAC_B4_C1_C2_C3_C4_Data
@@ -4941,7 +4953,7 @@ DacBank3:			startBank
 	DAC_Master_Table
 
 	if (s3_dac_no_voice_samples<>0)
-	DAC_AB_Data:		DACBINCLUDE "Sound/DAC/94-97.bin"
+	DAC_AB_Data:		DACBINCLUDE "Sound/DAC/A6.bin"
 	else
 	DAC_AB_Data:		DACBINCLUDE "Sound/DAC/AB.bin"
 	endif
@@ -4952,7 +4964,7 @@ DAC_B1_Data:			DACBINCLUDE "Sound/DAC/B1.bin"
 DAC_B4_C1_C2_C3_C4_Data:DACBINCLUDE "Sound/DAC/B4C1-C4.bin"
 DAC_B5_Data:			DACBINCLUDE "Sound/DAC/B5.bin"
 	if (s3_dac_no_voice_samples<>0)
-	DAC_B6_Data:		DACBINCLUDE "Sound/DAC/A8.bin" ; best replacement ive found
+	DAC_B6_Data:		DACBINCLUDE "Sound/DAC/B7.bin" ; best replacement ive found
 	else
 	DAC_B6_Data:		DACBINCLUDE "Sound/DAC/B6.bin"
 	endif
