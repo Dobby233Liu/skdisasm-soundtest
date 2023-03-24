@@ -45,6 +45,21 @@ org0 macro address
 	endif
     endm
 
+; define an alternate org that fills the extra space with ASCII spaces instead of FFs
+org20 macro address
+.diff := address - *
+	if .diff < 0
+		error "too much stuff before org0 $\{address} ($\{(-.diff)} bytes)"
+	else
+		while .diff > 1024
+			; AS can only generate 1 kb of code on a single line
+			dc.b [1024]$20
+.diff := .diff - 1024
+		endm
+		dc.b [.diff]$20
+	endif
+    endm
+
 ; define the cnop pseudo-instruction
 cnop macro offset,alignment
 	if notZ80(MOMCPU)
@@ -59,6 +74,11 @@ cnop0 macro offset,alignment
 	org0 (*-1+(alignment)-((*-1+(-(offset)))#(alignment)))
     endm
 
+; define an alternate cnop that fills the extra space with ASCII spaces instead of FFs
+cnop20 macro offset,alignment
+	org20 (*-1+(alignment)-((*-1+(-(offset)))#(alignment)))
+    endm
+
 ; redefine align in terms of cnop, because the built-in align can be stupid sometimes
 align macro alignment
 	cnop 0,alignment
@@ -67,6 +87,11 @@ align macro alignment
 ; define an alternate align that fills the extra space with 0s instead of FFs
 align0 macro alignment
 	cnop0 0,alignment
+    endm
+
+; define an alternate align that fills the extra space with ASCII spaces instead of FFs
+align20 macro alignment
+	cnop20 0,alignment
     endm
 
 ; define the even pseudo-instruction

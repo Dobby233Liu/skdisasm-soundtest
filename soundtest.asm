@@ -36,301 +36,224 @@ Vectors:	dc.l	$00000000,	EntryPoint,	ErrorTrap,	ErrorTrap	; 0
 		dc.l	ErrorTrap,	ErrorTrap,	ErrorTrap,	ErrorTrap	; 60
 Header:		dc.b "SEGA GENESIS    "
 Copyright:	dc.b "(C)SEGA 1994.JUN"
-Domestic_Name:	dc.b "SOUND TEST PROGRAM                              "
-Overseas_Name:	dc.b "SOUND TEST PROGRAM                              "
+Domestic_Name:	dc.b "SOUND TEST PROGRAM"
+    align20 $150-*
+Overseas_Name:	dc.b "SOUND TEST PROGRAM"
+    align20 $180-*
 Serial_Number:	dc.b "GM MK-IDFK -00"
 Checksum:	dc.w $0000
-Input:		dc.b "J               "
+Input:		dc.b "J"
+    align20 $1A0-*
 ROMStartLoc:	dc.l StartOfROM
 ROMEndLoc:	dc.l EndOfROM-1
 RAMStartLoc:	dc.l (RAM_start&$FFFFFF)
 RAMEndLoc:	dc.l (RAM_start&$FFFFFF)+$FFFF
 CartRAM_Info:	dc.b "  "
-CartRAM_Type:	dc.w %10000000100000
-CartRAMStartLoc:dc.l $20202020
-CartRAMEndLoc:	dc.l $20202020
+CartRAM_Type:	dc.b "  "
+CartRAMStartLoc:	dc.b "    "
+CartRAMEndLoc:	dc.b "    "
 Modem_Info:	dc.b "  "
 		dc.b "          "
-Unknown_Header:	dc.w  0
-		dc.b  "      "
-		dc.w  0,  0
-		dc.l  EndOfROM-1	; 0	;CHECKLATER (ROM Bank Info)
-		dc.b  "        "
-KiS2ROM_Info:	dc.b  "RO"
-KiS2ROM_Type:	dc.w %10000000100000
-KiS2ROMStartLoc:	tribyte $300000
-KiS2ROMEndLoc:		tribyte $33FFFF
-KiS2ROMStartLoc2:	tribyte $300000
-KiS2ROMEndLoc2:		tribyte $33FFFF
-Country_Code:	dc.b "JUE             "
-; ---------------------------------------------------------------------------
-SetupValues:	dc.w $8000,bytesToLcnt($10000),$100
-		dc.l Z80_RAM
-		dc.l Z80_bus_request
-		dc.l Z80_reset
-		dc.l VDP_data_port, VDP_control_port
-
-; values for VDP registers
-VDPInitValues:
-		dc.b 4			; Command $8004 - HInt off, Enable HV counter read
-		dc.b $14		; Command $8114 - Display off, VInt off, DMA on, PAL off
-		dc.b $30		; Command $8230 - Scroll A Address $C000
-		dc.b $3C		; Command $833C - Window Address $F000
-		dc.b 7			; Command $8407 - Scroll B Address $E000
-		dc.b $6C		; Command $856C - Sprite Table Address $D800
-		dc.b 0			; Command $8600 - Null
-		dc.b 0			; Command $8700 - Background color Pal 0 Color 0
-		dc.b 0			; Command $8800 - Null
-		dc.b 0			; Command $8900 - Null
-		dc.b $FF		; Command $8AFF - Hint timing $FF scanlines
-		dc.b 0			; Command $8B00 - Ext Int off, VScroll full, HScroll full
-		dc.b $81		; Command $8C81 - 40 cell mode, shadow/highlight off, no interlace
-		dc.b $37		; Command $8D37 - HScroll Table Address $DC00
-		dc.b 0			; Command $8E00 - Null
-		dc.b 1			; Command $8F01 - VDP auto increment 1 byte
-		dc.b 1			; Command $9001 - 64x32 cell scroll size
-		dc.b 0			; Command $9100 - Window H left side, Base Point 0
-		dc.b 0			; Command $9200 - Window V upside, Base Point 0
-		dc.b $FF		; Command $93FF - DMA Length Counter $FFFF
-		dc.b $FF		; Command $94FF - See above
-		dc.b 0			; Command $9500 - DMA Source Address $0
-		dc.b 0			; Command $9600 - See above
-		dc.b $80		; Command $9700	- See above + VRAM fill mode
-VDPInitValues_End:
-		dc.l	vdpComm($0000,VRAM,DMA)	; value for VRAM write mode
-
-; Z80 instructions (not the sound driver; that gets loaded later)
-Z80StartupCodeBegin:
-	if (*)+$26 < $10000
-	save
-	CPU Z80	; start assembling Z80 code
-	phase 0	; pretend we're at address 0
-		xor	a	; clear a to 0
-		ld	bc,((Z80_RAM_end-Z80_RAM)-zStartupCodeEndLoc)-1	; prepare to loop this many times
-		ld	de,zStartupCodeEndLoc+1	; initial destination address
-		ld	hl,zStartupCodeEndLoc	; initial source address
-		ld	sp,hl	; set the address the stack starts at
-		ld	(hl),a	; set first byte of the stack to 0
-		ldir		; loop to fill the stack (entire remaining available Z80 RAM) with 0
-		pop	ix	; clear ix
-		pop	iy	; clear iy
-		ld	i,a	; clear i
-		ld	r,a	; clear r
-		pop	de	; clear de
-		pop	hl	; clear hl
-		pop	af	; clear af
-		ex	af,af'	; swap af with af'
-		exx		; swap bc/de/hl with their shadow registers too
-		pop	bc	; clear bc
-		pop	de	; clear de
-		pop	hl	; clear hl
-		pop	af	; clear af
-		ld	sp,hl	; clear sp
-		di		; clear iff1 (for interrupt handler)
-		im	1	; interrupt handling mode = 1
-		ld	(hl),0E9h	; replace the first instruction with a jump to itself
-		jp	(hl)		; jump to the first instruction (to stay there forever)
-zStartupCodeEndLoc:
-	dephase	; stop pretending
-		restore
-	padding off	; unfortunately our flags got reset so we have to set them again...
-	else	; due to an address range limitation I could work around but don't think is worth doing so:
-		message "Warning: using pre-assembled Z80 startup code."
-		dc.w $AF01,$D91F,$1127,$0021,$2600,$F977,$EDB0,$DDE1,$FDE1,$ED47,$ED4F,$D1E1,$F108,$D9C1,$D1E1,$F1F9,$F3ED,$5636,$E9E9
-	endif
-Z80StartupCodeEnd:
-		dc.w $8104			; value for VDP display mode
-		dc.w $8F02			; value for VDP increment
-		dc.l vdpComm($0000,CRAM,WRITE)	; value for CRAM write mode
-		dc.l vdpComm($0000,VSRAM,WRITE)	; value for VSRAM write mode
-PSGInitValues:	dc.b $9F,$BF,$DF,$FF		; values for PSG channel volumes
-PSGInitValues_End:
-VDP_register_values:
-		dc.w $8004	; H-int disabled
-		dc.w $8134	; V-int enabled, display blanked, DMA enabled, 224 line display
-		dc.w $8230	; Scroll A PNT base $C000
-		dc.w $8320	; Window PNT base $8000
-		dc.w $8407	; Scroll B PNT base $E000
-		dc.w $857C	; Sprite attribute table base $F800
-		dc.w $8600
-		dc.w $8700	; Backdrop color is color 0 of the first palette line
-		dc.w $8800
-		dc.w $8900
-		dc.w $8A00
-		dc.w $8B00	; Full-screen horizontal and vertical scrolling
-		dc.w $8C81	; 40 cell wide display, no interlace
-		dc.w $8D3C	; Horizontal scroll table base $F000
-		dc.w $8E00
-		dc.w $8F02	; Auto-ncrement is 2
-		dc.w $9001	; Scroll planes are 64x32 cells
-		dc.w $9100
-		dc.w $9200	; Window disabled
+Country_Code:	dc.b "JUE "
 ; ---------------------------------------------------------------------------
 
 ; Trap for real unlike in SK
 ErrorTrap:
 		bra.s ErrorTrap
 
+;-------------------------------------------------------------------------
+; Streamlined Startup for Sonic the Hedgehog 1
+; Targets Sonic 3K SonicRetro AS, but can be adapted to
+; other disassemblies and other games.
+; (Made by RepellantMold, based on Sonic 2 SonicRetro AS)
+; NOTE: by default, this assumes you're hacking Sonic (3) & Knuckles.
+; Commented out lines with (Sonic 3) above them will be for s3.asm.
+; Includes code from MarkeyJester's init library:
+; https://pastebin.com/KXpmQxQp
+;-------------------------------------------------------------------------
 EntryPoint:
-		lea	(System_stack).w,sp
-		tst.l	(HW_Port_1_Control-1).l
-		bne.s	+
-		tst.w	(HW_Expansion_Control-1).l
-+
-		bne.s	.start	; in case of a soft reset
-		lea	SetupValues(pc),a5
-		movem.w	(a5)+,d5-d7
-		movem.l	(a5)+,a0-a4
-		move.b	HW_Version-Z80_bus_request(a1),d0	; get hardware version
-		andi.b	#$F,d0
-		beq.s	.initVDP	; branch if hardware is older than Genesis III
-		move.l	#'SEGA',Security_addr-Z80_bus_request(a1)	; satisfy the TMSS
+		lea	(System_stack).w,sp				; set stack pointer
+		lea	SetupValues(pc),a0				; load setup array
+		move.w	(a0)+,sr					; disable interrupts during setup; they will be reenabled by the Sega Screen
+		movem.l (a0)+,a1-a3/a5/a6				; Z80 RAM start, work RAM start, Z80 bus request register, VDP data port, VDP control port
+		movem.w (a0)+,d1/d2					; first VDP register value ($8004), VDP register increment/value for Z80 stop and reset release ($100)
+		moveq	#SetupVDP_end-SetupVDP-1,d5			; VDP registers loop counter
+		moveq	#0,d4						; DMA fill/memory clear/Z80 stop bit test value
+		movea.l d4,a4						; clear a4
+		move.l	a4,usp						; clear user stack pointer
+		
+		tst.w	HW_Expansion_Control-1-Z80_bus_request(a3)	; was this a soft reset?
+		bne.s	.wait_dma					; if so, skip setting region and the TMSS check
 
-	.initVDP:
-		move.w	(a4),d0	; check if VDP works
-		moveq	#0,d0
-		movea.l	d0,a6
-		move.l	a6,usp	; set usp to $0
-		moveq	#VDPInitValues_End-VDPInitValues-1,d1
+		move.b	HW_Version-Z80_bus_request(a3),d6		; load hardware version
+		move.b	d6,d3						; copy to d3 for checking revision (d6 will be used later to set region and speed)
+		andi.b	#$F,d3						; get only hardware version ID
+		beq.s	.wait_dma					; if Model 1 VA4 or earlier (ID = 0), branch
+		move.l	#'SEGA',Security_addr-Z80_bus_request(a3)	; satisfy the TMSS
+		
+.wait_dma:
+		move.w	(a6),ccr					; copy status register to CCR, clearing the VDP write latch and setting the overflow flag if a DMA is in progress
+		bvs.s	.wait_dma					; if a DMA was in progress during a soft reset, wait until it is finished
+	   
+.loop_vdp:
+		move.w	d2,(a6)						; set VDP register
+		add.w	d1,d2						; advance register ID
+		move.b	(a0)+,d2					; load next register value
+		dbf	d5,.loop_vdp					; repeat for all registers ; final value loaded will be used later to initialize I/0 ports
+	   
+		move.l	(a0)+,(a6)					; set DMA fill destination
+		move.w	d4,(a5)						; set DMA fill value (0000), clearing the VRAM
+			
+		tst.w	HW_Expansion_Control-1-Z80_bus_request(a3)	; was this a soft reset?
+		bne.s	.clear_every_reset				; if so, skip clearing RAM addresses $FE00-$FFFF
+	   
+		movea.l	(a0),a4						; System_stack	  (increment will happen later)
+		move.w	4(a0),d5					; repeat times
+		
+.loop_ram1:
+		move.l	d4,(a4)+
+		dbf	d5,.loop_ram1					; clear RAM ($FE00-$FFFF)
 
-	.initVDPLoop:
-		move.b	(a5)+,d5
-		move.w	d5,(a4)
-		add.w	d7,d5
-		dbf	d1,.initVDPLoop ; set all 24 registers
+.clear_every_reset:
+		addq	#6,a0						; advance to next position in setup array
+		move.w	(a0)+,d5					; repeat times
+		
+.loop_ram2:
+		move.l	d4,(a2)+					; a2 = start of 68K RAM
+		dbf	d5,.loop_ram2					; clear RAM ($0000-$FDFF)
 
-		move.l	(a5)+,(a4)	; set VRAM write mode
-		move.w	d0,(a3)	; clear the screen
-		move.w	d7,(a1)	; stop the Z80
-		move.w	d7,(a2)	; reset the Z80
+		move.w	d1,(a3)						; stop the Z80 (we will clear the VSRAM and CRAM while waiting for it to stop)
+		move.w	d1,Z80_reset-Z80_bus_request(a3)		; deassert Z80 reset (ZRES is held high on console reset until we clear it)
 
-	.initZ80:
-		btst	d0,(a1)	; has the Z80 stopped?
-		bne.s	.initZ80	; if not, branch
-		moveq	#Z80StartupCodeEnd-Z80StartupCodeBegin-1,d2
+		move.w	(a0)+,(a6)					; set VDP increment to 2
 
-	.initZ80Loop:
-		move.b	(a5)+,(a0)+
-		dbf	d2,.initZ80Loop
-		move.w	d0,(a2)
-		move.w	d0,(a1)	; start the Z80
-		move.w	d7,(a2)	; reset the Z80
+		move.l	(a0)+,(a6)					; set VDP to VSRAM write
+		moveq	#$14-1,d5					; set repeat times
+		
+.loop_vsram:
+		move.l	d4,(a5)						; clear 4 bytes of VSRAM
+		dbf	d5,.loop_vsram					; repeat until entire VSRAM has been cleared
 
-	.clearRAM:
-		move.l	d0,-(a6)		; Clear normal RAM
-		dbf	d6,.clearRAM
+		move.l	(a0)+,(a6)					; set VDP to CRAM write
+		moveq	#$20-1,d5					; set repeat times
+		
+.loop_cram:
+		move.l	d4,(a5)						; clear two palette entries
+		dbf	d5,.loop_cram					; repeat until entire CRAM has been cleared
 
-		move.l	(a5)+,(a4)	; set VDP display mode and increment
-		move.l	(a5)+,(a4)	; set VDP to CRAM write
-		moveq	#bytesToLcnt($80),d3
+.waitz80:
+		btst	d4,(a3)						; has the Z80 stopped?
+		bne.s	.waitz80					; if not, branch
 
-	.clearCRAM:
-		move.l	d0,(a3)			; Clear CRAM
-		dbf	d3,.clearCRAM
+		move.w	#$2000-1,d5					; size of Z80 ram - 1
+		
+.clear_Z80_RAM:
+		move.b 	d4,(a1)+					; clear the Z80 RAM
+		dbf	d5,.clear_Z80_RAM
+		
+		moveq	#4-1,d5						; set number of PSG channels to mute
+		
+.psg_loop:
+		move.b	(a0)+,PSG_input-VDP_data_port(a6)		; set the PSG channel volume to null (no sound)
+		dbf	d5,.psg_loop					; repeat for all channels
 
-		move.l	(a5)+,(a4)
-		moveq	#bytesToLcnt($50),d4
+		tst.w	HW_Expansion_Control-1-Z80_bus_request(a3)	; was this a soft reset?
+		bne.w	.set_vdp_buffer					; if so, skip the checksum check and setting the region variable
 
-	.clearVSRAM:
-		move.l	d0,(a3)			; Clear VSRAM
-		dbf	d4,.clearVSRAM
+		andi.b	 #$C0,d6					; get region and speed settings
+		move.b	 d6,(Graphics_flags).w				; set in RAM
+		
+.set_vdp_buffer:
+		move.w	d4,d5						; clear d5
+		move.b	SetupVDP(pc),d5					; get first entry of SetupVDP
+		ori.w	#$8100,d5					; make it a valid command word ($8134)
+		move.w	d5,(VDP_reg_1_command).w			; save to buffer for later use
+		move.w	#$8A00+(224-1),(H_int_counter_command).w	; horizontal interrupt every 224th scanline
+		
+;.load_sound_driver:
+		movem.w	d1/d2/d4,-(sp)					; back up these registers
+		move.l	a3,-(sp)
 
-		moveq	#PSGInitValues_End-PSGInitValues-1,d5
-
-	.initPSG:
-		move.b	(a5)+,PSG_input-VDP_data_port(a3)	; reset the PSG
-		dbf	d5,.initPSG
-
-		move.w	d0,(a2)
-		movem.l	(a6),d0-a6	; clear all registers
-		move	#$2700,sr	; set the sr
-
-	.start:
-		tst.w	(VDP_control_port).l
-		move.w	#$4EF9,(V_int_jump).w	; machine code for jmp
-		move.l	#VInt,(V_int_addr).w
-		move.w	#$4EF9,(H_int_jump).w
-		move.l	#HInt,(H_int_addr).w
--
-		move.w	(VDP_control_port).l,d1
-		btst	#1,d1
-		bne.s	-	; wait till a DMA is completed
-		lea	((RAM_start&$FFFFFF)).l,a6
-		moveq	#0,d7
-		move.w	#bytesToLcnt($FE00),d6
--
-		move.l	d7,(a6)+
-		dbf	d6,-
-
-		moveq	#0,d1
-
-
-GameStartup:
-
-Init_VDP:
-		lea	(VDP_control_port).l,a0
-		lea	(VDP_data_port).l,a1
-		lea	(VDP_register_values).l,a2
-		moveq	#18,d7
-
-$$setRegisters:
-		move.w	(a2)+,(a0)
-		dbf	d7,$$setRegisters
-		move.w	(VDP_register_values+2).l,d0	; get command for register #1
-		move.w	d0,(VDP_reg_1_command).w	; and store it in RAM (for easy display blanking/enabling)
-		move.w	#$8ADF,(H_int_counter_command).w
-		moveq	#0,d0
-		move.l	#vdpComm($0000,VSRAM,WRITE),(VDP_control_port).l
-		move.w	d0,(a1)
-		move.w	d0,(a1)
-		move.l	#vdpComm($0000,CRAM,WRITE),(VDP_control_port).l
-		move.w	#$3F,d7
-
-$$clearCRAM:
-		move.w	d0,(a1)
-		dbf	d7,$$clearCRAM
-		clr.l	(V_scroll_value).w
-		clr.l	(_unkF61A).w
-		move.l	d1,-(sp)
-		dmaFillVRAM 0,$0000,$10000	; clear entire VRAM
-		move.l	(sp)+,d1
-; End of function Init_VDP
-
-SndDrvInit:
-		nop
-		move.w	#$100,(Z80_bus_request).l
-		move.w	#$100,(Z80_reset).l	; release Z80 reset
-
-		; Load SMPS sound driver
-		lea	(Z80_SoundDriver).l,a0
+		lea	(z80_SoundDriverStart).l,a0				; Load Z80 SMPS sound driver
 		lea	(Z80_RAM).l,a1
 		bsr.w	Kos_Decomp
-		; Load default variables
-		moveq	#0,d1
-		lea	(Z80_RAM+z80_stack).l,a1
-		move.w	#bytesToXcnt(zTracksStart-z80_stack, 8),d0
--
-		movep.l	d1,0(a1)
-		movep.l	d1,1(a1)
-		addq.w	#8,a1
-		dbf	d0,-
-		; Detect PAL region consoles
-		btst	#6,(Graphics_flags).w
-		beq.s	+
-		move.b	#1,(Z80_RAM+zPalFlag).l
-+
-		move.w	#0,(Z80_reset).l	; reset Z80
-		nop
-		nop
-		nop
-		nop
-		move.w	#$100,(Z80_reset).l	; release reset
-		startZ80
-; End of function SndDrvInit
+
+		btst	#6,(Graphics_flags).w				; are we on a PAL console?
+		sne	zPalFlag(a1)					; if so, set the driver's PAL flag
+		
+		move.l	(sp)+,a3
+		movem.w (sp)+,d1/d2/d4					; restore registers
+
+		move.w	d4,Z80_reset-Z80_bus_request(a3)		; reset Z80 (d7 = 0 after returning from Saxman decompressor)
+		
+		move.b	d2,HW_Port_1_Control-Z80_bus_request(a3)	; initialise port 1
+		move.b	d2,HW_Port_2_Control-Z80_bus_request(a3)	; initialise port 2
+		move.b	d2,HW_Expansion_Control-Z80_bus_request(a3)	; initialise port e
+
+		move.w	d1,Z80_reset-Z80_bus_request(a3)		; release Z80 reset
+		move.w	d4,(a3)						; start the Z80
+		
+		move.w	#$4EF9,d0					; machine code for jmp
+		move.w	d0,(V_int_jump).w
+		move.l	#VInt,(V_int_addr).w
+		move.w	d0,(H_int_jump).w
+		move.l	#HInt,(H_int_addr).w
+
+		bra.s	GameInitTrue
+		
+; ---------------------------------------------------------------------------		
+SetupValues:
+		dc.w	$2700						; disable interrupts
+		dc.l	Z80_RAM
+		dc.l	$FFFF0000					; ram_start
+		dc.l	Z80_bus_request
+		dc.l	VDP_data_port
+		dc.l	VDP_control_port
+
+		dc.w	$100						; VDP Reg increment value & opposite initialisation flag for Z80
+		dc.w	$8004						; $8004; normal color mode, horizontal interrupts disabled
+SetupVDP:
+		dc.b	$8134&$FF					; $8134; mode 5, NTSC, vertical interrupts and DMA enabled 
+		dc.b	($8200+($C000>>10))&$FF				; $8230; foreground nametable starts at $C000
+		dc.b	($8300+($8000>>10))&$FF				; $833C; window nametable starts at $8000
+		dc.b	($8400+($E000>>13))&$FF				; $8407; background nametable starts at $E000
+		dc.b	($8500+($F800>>9))&$FF				; $856C; sprite attribute table starts at $F800
+		dc.b	$8600&$FF					; $8600; unused (high bit of sprite attribute table for 128KB VRAM)
+		dc.b	$8700&$FF					; $8700; background colour (palette line 0 color 0)
+		dc.b	$8800&$FF					; $8800; unused (mode 4 hscroll register)
+		dc.b	$8900&$FF					; $8900; unused (mode 4 vscroll register)
+		dc.b	($8A00+0)&$FF					; $8A00; horizontal interrupt register (set to 0 for now)
+		dc.b	$8B00&$FF					; $8B00; full-screen vertical/horizontal scrolling
+		dc.b	$8C81&$FF					; $8C81; H40 display mode
+		dc.b	($8D00+($F000>>10))&$FF				; $8D3F; hscroll table starts at $FC00
+		dc.b	$8E00&$FF					; $8E00: unused (high bits of fg and bg nametable addresses for 128KB VRAM)
+		dc.b	($8F00+1)&$FF					; $8F01; VDP increment size (will be changed to 2 later)
+		dc.b	$9001&$FF					; $9001; 64x32 plane size
+		dc.b	$9100&$FF					; $9100; unused (window horizontal position)
+		dc.b	$9200&$FF					; $9200; unused (window vertical position)
+
+		dc.w	$FFFF						; $93FF/$94FF - DMA length
+		dc.w	0						; VDP $9500/9600 - DMA source
+		dc.b	$9780&$FF					; VDP $9780 - DMA fill VRAM
+
+		dc.b	$40						; I/O port initialization value
+	   
+SetupVDP_end:
+
+		dc.l	vdpComm($0000,VRAM,DMA)				; DMA fill VRAM
+		dc.l	System_stack					; start of RAM only cleared on cold boot
+		dc.w	(($FFFFFFFF-$FFFFFE00+1)/4)-1			; loops to clear RAM cleared only on cold boot
+		dc.w	((System_stack&$FFFF)/4)-1			; loops to clear RAM cleared on all boots
+		dc.w	$8F00+2						; VDP increment
+		dc.l	vdpComm($0000,VSRAM,WRITE)			; VSRAM write mode
+		dc.l 	vdpComm($0000,CRAM,WRITE)			; CRAM write mode
+
+		dc.b	$9F,$BF,$DF,$FF					; PSG mute values (PSG 1 to 4) 
+		even
 
 GameInitTrue:
 	; delay moment
-		move.w	#$40,d0
+		move.w	#60-1,d0
 	.wait1:
 		bsr.w	Wait_VSync
 		dbf	d0,.wait1
@@ -338,8 +261,7 @@ GameInitTrue:
 		move.w	#signextendB(mus_Default),d0
 		bsr.w	Play_Music
 
-GameLoop:
-		bra.s	GameLoop
+		bra.w	ErrorTrap
 
 ; ---------------------------------------------------------------------------
 
@@ -657,7 +579,6 @@ KosDec_ByteMap:
 
 	; sound driver
 	include "Sound/Flamedriver/Flamedriver.asm"
-	align $8000
 
 ; ---------------------------------------------------------------------------
 

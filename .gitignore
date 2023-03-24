@@ -23,3 +23,5 @@ Build/skbuiltOutput.txt
 Build/sonic3kBinaryOutput.txt
 Build/sonic3kErrors.txt
 Build/sonic3kOutput.txt
+clownmdemu-frontend-imgui.ini
+clownmdemu-frontend.ini

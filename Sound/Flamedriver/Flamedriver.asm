@@ -4694,7 +4694,7 @@ __LABEL__ label *
 	set	soundBankName,"__LABEL__"
 	endm
 
-DebugSoundbanks = 1
+DebugSoundbanks = 0
 
 finishBank macro
 	if * > soundBankStart + $8000
@@ -4765,8 +4765,13 @@ DACPointers label *
 		DAC_Setup $18,DAC_9E_Data
 	endif
 	if (use_s3_samples<>0)||(use_sk_samples<>0)
+		if (s3_dac_no_voice_samples<>0)
+		DAC_Setup $0A,DAC_9F_Data
+		DAC_Setup $0A,DAC_A0_Data
+		else
 		DAC_Setup $0C,DAC_9F_Data
 		DAC_Setup $0C,DAC_A0_Data
+		endif
 		DAC_Setup $0A,DAC_A1_Data
 		DAC_Setup $0A,DAC_A2_Data
 		DAC_Setup $18,DAC_A3_Data
@@ -4918,8 +4923,8 @@ DAC_9E_Data:			DACBINCLUDE "Sound/DAC/9E.bin"
 
 	if (use_s3_samples<>0)||(use_sk_samples<>0)
 	if (s3_dac_no_voice_samples<>0)
-	DAC_9F_Data:		DACBINCLUDE "Sound/DAC/empty.bin"
-	DAC_A0_Data:		DACBINCLUDE "Sound/DAC/empty.bin"
+	DAC_9F_Data:		DACBINCLUDE "Sound/DAC/A1.bin"
+	DAC_A0_Data:		DACBINCLUDE "Sound/DAC/A1.bin"
 	else
 	DAC_9F_Data:		DACBINCLUDE "Sound/DAC/9F.bin"
 	DAC_A0_Data:		DACBINCLUDE "Sound/DAC/A0.bin"
@@ -4975,7 +4980,7 @@ DAC_BB_Data:			DACBINCLUDE "Sound/DAC/BB.bin"
 DAC_BC_Data:			DACBINCLUDE "Sound/DAC/BC.bin"
 DAC_BD_Data:			DACBINCLUDE "Sound/DAC/BD.bin"
 	if (s3_dac_no_voice_samples<>0)
-	DAC_BE_Data:		DACBINCLUDE "Sound/DAC/A2.bin"
+	DAC_BE_Data:		DACBINCLUDE "Sound/DAC/A1.bin"
 	else
 	DAC_BE_Data:		DACBINCLUDE "Sound/DAC/BE.bin"
 	endif
@@ -5037,6 +5042,6 @@ Mus_Bank1_Start:	startBank
 	Music_Master_Table
 z80_UniVoiceBank:	include "Sound/Flamedriver/UniBank.asm"
 
-MusData_Default:			include	"Sound/Flamedriver/lean.asm"
+MusData_Default:			include	"Sound/Flamedriver/sk/music-optimized/DDZ.asm"
 
 	finishBank

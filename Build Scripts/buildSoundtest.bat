@@ -53,7 +53,7 @@ pause
 goto LABLEXIT
 
 :LABLERROR3
-REM // display a noticeable message
+REM // display a noticable message
 echo.
 echo ***************************************************************************
 echo *                                                                         *
