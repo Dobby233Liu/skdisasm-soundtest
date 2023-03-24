@@ -1,22 +1,15 @@
-; ---------------------------------------------------------------------------
 		cpu 68000
-		include "sonic3k.macrosetup.asm"	; include a few basic macros
-		include "sonic3k.macros.asm"		; include some simplifying macros and functions
-		include "sonic3k.constants.asm"		; include some constants
+
+		include "sonic3k.macrosetup.asm"		; include a few basic macros
+		include "sonic3k.macros.mini.asm"		; include some simplifying macros and functions
+		include "sonic3k.constants.mini.asm"	; include some constants
+
 		org 0
-; ---------------------------------------------------------------------------
-
-Size_of_Snd_driver_guess = $1200
-mus_Default	= $01
-
-; ---------------------------------------------------------------------------
-
-StartOfROM:
 	if * <> 0
-		fatal "StartOfROM was $\{*} but it should be 0"
+		fatal "Start of ROM was $\{*} but it should be 0"
 	endif
 
-Vectors:	dc.l	$00000000,	EntryPoint,	ErrorTrap,	ErrorTrap	; 0
+Vectors:	dc.l	0,	EntryPoint,	ErrorTrap,	ErrorTrap	; 0
 		dc.l	ErrorTrap,	ErrorTrap,	ErrorTrap,	ErrorTrap	; 4
 		dc.l	ErrorTrap,	ErrorTrap,	ErrorTrap,	ErrorTrap	; 8
 		dc.l	ErrorTrap,	ErrorTrap,	ErrorTrap,	ErrorTrap	; 12
@@ -41,7 +34,7 @@ Overseas_Name:	dc.b "SOUND TEST PROGRAM"
 Serial_Number:	dc.b "GM 0000test-00"
 Checksum:	dc.w $0000
     align20 $1A0
-ROMStartLoc:	dc.l StartOfROM
+ROMStartLoc:	dc.l 0
 ROMEndLoc:	dc.l EndOfROM-1
 RAMStartLoc:	dc.l (RAM_start&$FFFFFF)
 RAMEndLoc:	dc.l (RAM_start&$FFFFFF)+$FFFF
@@ -52,6 +45,7 @@ CartRAMEndLoc:	dc.b "    "
 Modem_Info:	dc.b "  "
 		dc.b "          "
 Country_Code:	dc.b "JUE "
+
 ; ---------------------------------------------------------------------------
 
 ErrorTrap:	bra.s *
@@ -67,7 +61,7 @@ ErrorTrap:	bra.s *
 ; https://pastebin.com/KXpmQxQp
 ;-------------------------------------------------------------------------
 EntryPoint:
-		lea	(System_stack).w,sp				; set stack pointer
+		lea	System_stack,sp				; set stack pointer
 		lea	SetupValues(pc),a0				; load setup array
 		move.w	(a0)+,sr					; disable interrupts during setup; they will be reenabled by the Sega Screen
 		movem.l (a0)+,a1-a3/a5/a6				; Z80 RAM start, work RAM start, Z80 bus request register, VDP data port, VDP control port
@@ -152,18 +146,7 @@ EntryPoint:
 		move.b	(a0)+,PSG_input-VDP_data_port(a6)		; set the PSG channel volume to null (no sound)
 		dbf	d5,.psg_loop					; repeat for all channels
 
-		tst.w	HW_Expansion_Control-1-Z80_bus_request(a3)	; was this a soft reset?
-		bne.w	.set_vdp_buffer					; if so, skip the checksum check and setting the region variable
-
-		andi.b	 #$C0,d6					; get region and speed settings
-		move.b	 d6,(Graphics_flags).w				; set in RAM
-		
-.set_vdp_buffer:
 		move.w	d4,d5						; clear d5
-		move.b	SetupVDP(pc),d5					; get first entry of SetupVDP
-		ori.w	#$8100,d5					; make it a valid command word ($8134)
-		move.w	d5,(VDP_reg_1_command).w			; save to buffer for later use
-		move.w	#$8A00+(224-1),(H_int_counter_command).w	; horizontal interrupt every 224th scanline
 		
 ;.load_sound_driver:
 		movem.w	d1/d2/d4,-(sp)					; back up these registers
@@ -173,13 +156,14 @@ EntryPoint:
 		lea	(Z80_RAM).l,a1
 		bsr	Kos_Decomp
 
-		btst	#6,(Graphics_flags).w				; are we on a PAL console?
+		andi.b	 #$C0,d6					; get region and speed settings
+		btst	#6,d6						; are we on a PAL console?
 		sne	zPalFlag(a1)					; if so, set the driver's PAL flag
 		
 		move.l	(sp)+,a3
 		movem.w (sp)+,d1/d2/d4					; restore registers
 
-		move.w	d4,Z80_reset-Z80_bus_request(a3)		; reset Z80 (d7 = 0 after returning from Saxman decompressor)
+		move.w	d4,Z80_reset-Z80_bus_request(a3)		; reset Z80
 		
 		move.b	d2,HW_Port_1_Control-Z80_bus_request(a3)	; initialise port 1
 		move.b	d2,HW_Port_2_Control-Z80_bus_request(a3)	; initialise port 2
@@ -189,10 +173,10 @@ EntryPoint:
 		move.w	d4,(a3)						; start the Z80
 		
 		move.w	#$4EF9,d0					; machine code for jmp
-		move.w	d0,(V_int_jump).w
-		move.l	#VInt,(V_int_addr).w
-		move.w	d0,(H_int_jump).w
-		move.l	#HInt,(H_int_addr).w
+		move.w	d0,V_int_jump
+		move.l	#VInt,V_int_addr
+		move.w	d0,H_int_jump
+		move.l	#HInt,H_int_addr
 
 		bra	GameInitTrue
 		
@@ -252,41 +236,28 @@ VInt:
 -		move.w	(VDP_control_port).l,d0
 		andi.w	#8,d0
 		beq	-	; wait until vertical blanking is taking place
-		move.b	#0,(V_int_routine).w
+		move.b	#0,V_int_executing
 		movem.l	(sp)+,d0-a6
 HInt:
 		rte
 
-wait macro time
-		move.w	#time-1,d0
--		bsr	Wait_VSync
-		dbf	d0,-
-	endm
-
 GameInitTrue:
 		; delay moment
-		wait 60
+		wait	60
 
-		move.w	#signextendB(mus_Default),d0
-		bsr	Play_Music
+		music	mus_Default
 
 		bra	*
 
-Play_Music:
-		stopZ80
-		move.b	d0,(Z80_RAM+zMusicNumber).l
-		startZ80
-		rts
-; End of function Play_Music
+; ---------------------------------------------------------------------------
+; Called at the end of each frame to wait for vertical synchronization
+; ---------------------------------------------------------------------------
 
-; ---------------------------------------------------------------------------
-; Called at the end of each frame to perform vertical synchronization
-; ---------------------------------------------------------------------------
 Wait_VSync:
-		move.b	#1,(V_int_routine).w
+		move.b	#1,V_int_executing
 		move	#$2300,sr
 -
-		tst.b	(V_int_routine).w
+		tst.b	V_int_executing
 		bne	-	; wait until V-int's run
 		rts
 ; End of function Wait_VSync
@@ -515,12 +486,10 @@ KosDec_ByteMap:
 	dc.b	$07,$87,$47,$C7,$27,$A7,$67,$E7,$17,$97,$57,$D7,$37,$B7,$77,$F7
 	dc.b	$0F,$8F,$4F,$CF,$2F,$AF,$6F,$EF,$1F,$9F,$5F,$DF,$3F,$BF,$7F,$FF
 	endif
+
 ; ===========================================================================
 
-; ---------------------------------------------------------------------------
-
+Size_of_Snd_driver_guess = $1200
 		include "Sound/Flamedriver/Flamedriver.asm"
-		;align $8000
 
-EndOfROM:
-		END
+EndOfROM:	END

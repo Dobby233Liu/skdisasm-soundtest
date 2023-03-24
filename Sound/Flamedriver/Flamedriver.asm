@@ -5042,6 +5042,7 @@ Mus_Bank1_Start:	startBank
 	Music_Master_Table
 z80_UniVoiceBank:	include "Sound/Flamedriver/UniBank.asm"
 
-MusData_Default:			include	"Sound/Flamedriver/s3/music-optimized/Sonic 3 Miniboss.asm"
+	include	"Sound/Flamedriver/sk/music-optimized/ICZ1.asm" ; song with shared voice table
+MusData_Default:			include	"Sound/Flamedriver/sk/music-optimized/ICZ2.asm"
 
 	finishBank
