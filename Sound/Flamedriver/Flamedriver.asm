@@ -4798,7 +4798,7 @@ DACPointers label *
 		DAC_Setup $0C,DAC_B4_C1_C2_C3_C4_Data
 		DAC_Setup $0C,DAC_B5_Data
 		if (s3_dac_no_voice_samples<>0)
-		DAC_Setup $18,DAC_B6_Data
+		DAC_Setup $04,DAC_B6_Data
 		else
 		DAC_Setup $0C,DAC_B6_Data
 		endif
@@ -4969,7 +4969,7 @@ DAC_B1_Data:			DACBINCLUDE "Sound/DAC/B1.bin"
 DAC_B4_C1_C2_C3_C4_Data:DACBINCLUDE "Sound/DAC/B4C1-C4.bin"
 DAC_B5_Data:			DACBINCLUDE "Sound/DAC/B5.bin"
 	if (s3_dac_no_voice_samples<>0)
-	DAC_B6_Data:		DACBINCLUDE "Sound/DAC/B7.bin" ; best replacement ive found
+	DAC_B6_Data:		DACBINCLUDE "Sound/DAC/86.bin" ; best replacement ive found
 	else
 	DAC_B6_Data:		DACBINCLUDE "Sound/DAC/B6.bin"
 	endif
