@@ -6,10 +6,8 @@
 		org 0
 ; ---------------------------------------------------------------------------
 
-add_padding = 0
 Size_of_Snd_driver_guess = $1200
 mus_Default	= $01
-V_int_executing = V_int_routine
 
 ; ---------------------------------------------------------------------------
 
@@ -37,13 +35,12 @@ Vectors:	dc.l	$00000000,	EntryPoint,	ErrorTrap,	ErrorTrap	; 0
 Header:		dc.b "SEGA GENESIS    "
 Copyright:	dc.b "(C)SEGA 1994.JUN"
 Domestic_Name:	dc.b "SOUND TEST PROGRAM"
-    align20 $150-*
+    align20 $150
 Overseas_Name:	dc.b "SOUND TEST PROGRAM"
-    align20 $180-*
-Serial_Number:	dc.b "GM MK-IDFK -00"
+    align20 $180
+Serial_Number:	dc.b "GM 0000test-00"
 Checksum:	dc.w $0000
-Input:		dc.b "J"
-    align20 $1A0-*
+    align20 $1A0
 ROMStartLoc:	dc.l StartOfROM
 ROMEndLoc:	dc.l EndOfROM-1
 RAMStartLoc:	dc.l (RAM_start&$FFFFFF)
@@ -57,9 +54,7 @@ Modem_Info:	dc.b "  "
 Country_Code:	dc.b "JUE "
 ; ---------------------------------------------------------------------------
 
-; Trap for real unlike in SK
-ErrorTrap:
-		bra.s ErrorTrap
+ErrorTrap:	bra.s *
 
 ;-------------------------------------------------------------------------
 ; Streamlined Startup for Sonic the Hedgehog 1
@@ -176,7 +171,7 @@ EntryPoint:
 
 		lea	(z80_SoundDriverStart).l,a0				; Load Z80 SMPS sound driver
 		lea	(Z80_RAM).l,a1
-		bsr.w	Kos_Decomp
+		bsr	Kos_Decomp
 
 		btst	#6,(Graphics_flags).w				; are we on a PAL console?
 		sne	zPalFlag(a1)					; if so, set the driver's PAL flag
@@ -199,9 +194,10 @@ EntryPoint:
 		move.w	d0,(H_int_jump).w
 		move.l	#HInt,(H_int_addr).w
 
-		bra.s	GameInitTrue
+		bra	GameInitTrue
 		
-; ---------------------------------------------------------------------------		
+; ---------------------------------------------------------------------------	
+
 SetupValues:
 		dc.w	$2700						; disable interrupts
 		dc.l	Z80_RAM
@@ -251,59 +247,30 @@ SetupVDP_end:
 		dc.b	$9F,$BF,$DF,$FF					; PSG mute values (PSG 1 to 4) 
 		even
 
-GameInitTrue:
-	; delay moment
-		move.w	#60-1,d0
-	.wait1:
-		bsr.w	Wait_VSync
-		dbf	d0,.wait1
-
-		move.w	#signextendB(mus_Default),d0
-		bsr.w	Play_Music
-
-		bra.w	ErrorTrap
-
-; ---------------------------------------------------------------------------
-
-; ---------------------------------------------------------------------------
-; Called at the end of each frame to perform vertical synchronization
-; ---------------------------------------------------------------------------
-
-; =============== S U B R O U T I N E =======================================
-
-
-Wait_VSync:
-		move.b	#1,(V_int_executing).w
-		move	#$2300,sr
--
-		tst.b	(V_int_executing).w
-		bne.s	-	; wait until V-int's run
-		rts
-; End of function Wait_VSync
-
-; ---------------------------------------------------------------------------
-; Vertical interrupt handler
-; ---------------------------------------------------------------------------
-
 VInt:
 		movem.l	d0-a6,-(sp)
--
-		move.w	(VDP_control_port).l,d0
+-		move.w	(VDP_control_port).l,d0
 		andi.w	#8,d0
-		beq.s	-	; wait until vertical blanking is taking place
-		move.b	#0,(V_int_executing).w
+		beq	-	; wait until vertical blanking is taking place
+		move.b	#0,(V_int_routine).w
 		movem.l	(sp)+,d0-a6
-		rte
-
 HInt:
 		rte
 
-; ---------------------------------------------------------------------------
-; Always replaces an index previous passed to this function
-; ---------------------------------------------------------------------------
+wait macro time
+		move.w	#time-1,d0
+-		bsr	Wait_VSync
+		dbf	d0,-
+	endm
 
-; =============== S U B R O U T I N E =======================================
+GameInitTrue:
+		; delay moment
+		wait 60
 
+		move.w	#signextendB(mus_Default),d0
+		bsr	Play_Music
+
+		bra	*
 
 Play_Music:
 		stopZ80
@@ -313,40 +280,16 @@ Play_Music:
 ; End of function Play_Music
 
 ; ---------------------------------------------------------------------------
-; Can handle up to two different indexes in one frame
+; Called at the end of each frame to perform vertical synchronization
 ; ---------------------------------------------------------------------------
-
-; =============== S U B R O U T I N E =======================================
-
-
-Play_SFX:
-		stopZ80
-		cmp.b	(Z80_RAM+zSFXNumber0).l,d0
-		beq.s	++
-		tst.b	(Z80_RAM+zSFXNumber0).l
-		bne.s	+
-		move.b	d0,(Z80_RAM+zSFXNumber0).l
-		startZ80
+Wait_VSync:
+		move.b	#1,(V_int_routine).w
+		move	#$2300,sr
+-
+		tst.b	(V_int_routine).w
+		bne	-	; wait until V-int's run
 		rts
-+
-		move.b	d0,(Z80_RAM+zSFXNumber1).l
-+
-		startZ80
-
-Play_SFX_Done:
-		rts
-; End of function Play_SFX
-
-
-; =============== S U B R O U T I N E =======================================
-
-
-Change_Music_Tempo:
-		stopZ80
-		move.b	d0,(Z80_RAM+zTempoSpeedup).l
-		startZ80
-		rts
-; End of function Change_Music_Tempo
+; End of function Wait_VSync
 
 ; ---------------------------------------------------------------------------
 ; |||||||||||||||||||||| S U B R O U T I N E ||||||||||||||||||||||||||||||||
@@ -387,7 +330,6 @@ _Kos_ReadBit macro
 ; ===========================================================================
 ; KozDec_193A:
 Kos_Decomp:
-KosDec:
 	moveq	#(1<<_Kos_LoopUnroll)-1,d7
 	if _Kos_UseLUT==1
 	moveq	#0,d0
@@ -577,22 +519,8 @@ KosDec_ByteMap:
 
 ; ---------------------------------------------------------------------------
 
-	; sound driver
-	include "Sound/Flamedriver/Flamedriver.asm"
-
-; ---------------------------------------------------------------------------
-
-	; End-of-ROM padding stuff
-	if add_padding
-	if (*)&(*-1)
-		cnop -1,2<<lastbit(*)
-		dc.b $FF ; AS would automatically strip this padding if we didn't specifically declare one byte at the end
-	else
-		even
-	endif
-	else
-		even
-	endif
+		include "Sound/Flamedriver/Flamedriver.asm"
+		;align $8000
 
 EndOfROM:
 		END
