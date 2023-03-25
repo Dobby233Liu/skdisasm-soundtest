@@ -4783,7 +4783,7 @@ DACPointers label *
 		DAC_Setup $0C,DAC_A9_Data
 		DAC_Setup $0A,DAC_AA_Data
 		if (s3_dac_no_voice_samples<>0)
-		DAC_Setup $0A,DAC_AB_Data
+		DAC_Setup $0B,DAC_AB_Data
 		else
 		DAC_Setup $0D,DAC_AB_Data
 		endif
@@ -5042,7 +5042,6 @@ Mus_Bank1_Start:	startBank
 	Music_Master_Table
 z80_UniVoiceBank:	include "Sound/Flamedriver/UniBank.asm"
 
-	include	"Sound/Flamedriver/sk/music-optimized/ICZ1.asm" ; song with shared voice table
-MusData_Default:			include	"Sound/Flamedriver/sk/music-optimized/ICZ2.asm"
+MusData_Default:			include	"Sound/Flamedriver/scratchpad.asm"
 
 	finishBank

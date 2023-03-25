@@ -156,9 +156,9 @@ EntryPoint:
 		lea	(Z80_RAM).l,a1
 		bsr	Kos_Decomp
 
-		andi.b	 #$C0,d6					; get region and speed settings
-		btst	#6,d6						; are we on a PAL console?
-		sne	zPalFlag(a1)					; if so, set the driver's PAL flag
+		andi.b	#$C0,d6							; get region and speed settings
+		btst	#6,d6							; are we on a PAL console?
+		sne		zPalFlag(a1)					; if so, set the driver's PAL flag
 		
 		move.l	(sp)+,a3
 		movem.w (sp)+,d1/d2/d4					; restore registers
@@ -185,7 +185,7 @@ EntryPoint:
 SetupValues:
 		dc.w	$2700						; disable interrupts
 		dc.l	Z80_RAM
-		dc.l	$FFFF0000					; ram_start
+		dc.l	RAM_start
 		dc.l	Z80_bus_request
 		dc.l	VDP_data_port
 		dc.l	VDP_control_port
