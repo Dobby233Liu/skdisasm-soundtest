@@ -5572,7 +5572,7 @@ Mus_Bank1_Start:	startBank
 	Music_Master_Table
 	if (dobby_mods<>0)
 z80_UniVoiceBank:	include "Sound/Flamedriver/UniBank.asm"
-MusData_Default:		include	"Sound/Flamedriver/s3/music/Knuckles (Sonic 3).asm"
+MusData_Default:		include	"Sound/Flamedriver/scratchpad.asm"
 	else
 z80_UniVoiceBank:	include "Sound/UniBank.asm"
 MusData_FBZ1:			include	"Sound/Music/FBZ1.asm"
