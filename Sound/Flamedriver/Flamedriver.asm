@@ -4495,8 +4495,12 @@ zPlaySEGAPCM:
 ; sample being played -- the code still results in a valid bank switch, and
 ; does not need to worry about special cases.
 DAC_Banks:
+	if (dobby_mods<>0)
+		db		zmake68kBank(FirstDacBank)
+	else
 ; Set to zero to not use S3/S&K DAC samples:
 		db		zmake68kBank(DacBank1)
+	endif
 	if (use_s3_samples<>0)||(use_sk_samples<>0)||(use_s3d_samples<>0)
 		db	zmake68kBank(DAC_81_Data)
 		db	zmake68kBank(DAC_82_83_84_85_Data)
@@ -5058,6 +5062,10 @@ zMusIDPtr__End label *
 ; DAC Banks
 ; ===========================================================================
 
+	if (dobby_mods<>0)
+FirstDacBank:
+	endif
+
 	if (use_s3_samples<>0)||(use_sk_samples<>0)||(use_s3d_samples<>0)
 ; ---------------------------------------------------------------------------
 ; DAC Bank 1
@@ -5089,13 +5097,13 @@ DAC_D8_D9_Data:			DACBINCLUDE "Sound/DAC/D8-D9.bin"
 	endif
 
 	finishBank
+	endif ; dobby: moved this from the DAC_Master_Table line below
 
 ; ---------------------------------------------------------------------------
 ; Dac Bank 2
 ; ---------------------------------------------------------------------------
 DacBank2:			startBank
 	DAC_Master_Table
-	endif
 
 	if (use_s3_samples<>0)||(use_sk_samples<>0)||(use_s3d_samples<>0)
 DAC_9C_Data:			DACBINCLUDE "Sound/DAC/9C.bin"
