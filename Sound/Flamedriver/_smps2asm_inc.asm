@@ -82,7 +82,41 @@ nMaxPSG2			EQU nB6
 			enum		dKick=$81,dSnare,dClap,dScratch,dTimpani,dHiTom,dVLowClap,dHiTimpani,dMidTimpani
 			nextenum	dLowTimpani,dVLowTimpani,dMidTom,dLowTom,dFloorTom,dHiClap
 			nextenum	dMidClap,dLowClap
-		elsecase;SonicDriverVer>=3
+		case 3
+			enum		dSnareS3=$81,dHighTom,dMidTomS3,dLowTomS3,dFloorTomS3,dKickS3,dMuffledSnare
+			nextenum	dCrashCymbal,dRideCymbal,dLowMetalHit,dMetalHit,dHighMetalHit
+			nextenum	dHigherMetalHit,dMidMetalHit,dClapS3,dElectricHighTom
+			nextenum	dElectricMidTom,dElectricLowTom,dElectricFloorTom
+			nextenum	dTightSnare,dMidpitchSnare,dLooseSnare,dLooserSnare
+			nextenum	dHiTimpaniS3,dLowTimpaniS3,dMidTimpaniS3,dQuickLooseSnare
+			nextenum	dClick,dPowerKick,dQuickGlassCrash
+			nextenum	dGlassCrashSnare,dGlassCrash,dGlassCrashKick,dQuietGlassCrash
+			nextenum	dOddSnareKick,dKickExtraBass,dComeOn,dDanceSnare,dLooseKick
+			nextenum	dModLooseKick,dWoo,dGo,dSnareGo,dPowerTom,dHiWoodBlock,dLowWoodBlock
+			nextenum	dHiHitDrum,dLowHitDrum,dMetalCrashHit,dEchoedClapHit_S3
+			nextenum	dLowerEchoedClapHit_S3,dHipHopHitKick,dHipHopHitPowerKick
+			nextenum	dBassHey,dDanceStyleKick,dHipHopHitKick2,dHipHopHitKick3
+			nextenum	dReverseFadingWind,dScratchS3,dLooseSnareNoise,dPowerKick2
+			nextenum	dCrashingNoiseWoo,dQuickHit,dKickHey,dPowerKickHit
+			nextenum	dLowPowerKickHit,dLowerPowerKickHit,dLowestPowerKickHit
+		case 4
+			enum		dSnareS3=$81,dHighTom,dMidTomS3,dLowTomS3,dFloorTomS3,dKickS3,dMuffledSnare
+			nextenum	dCrashCymbal,dRideCymbal,dLowMetalHit,dMetalHit,dHighMetalHit
+			nextenum	dHigherMetalHit,dMidMetalHit,dClapS3,dElectricHighTom
+			nextenum	dElectricMidTom,dElectricLowTom,dElectricFloorTom
+			nextenum	dTightSnare,dMidpitchSnare,dLooseSnare,dLooserSnare
+			nextenum	dHiTimpaniS3,dLowTimpaniS3,dMidTimpaniS3,dQuickLooseSnare
+			nextenum	dClick,dPowerKick,dQuickGlassCrash
+			nextenum	dGlassCrashSnare,dGlassCrash,dGlassCrashKick,dQuietGlassCrash
+			nextenum	dOddSnareKick,dKickExtraBass,dComeOn,dDanceSnare,dLooseKick
+			nextenum	dModLooseKick,dWoo,dGo,dSnareGo,dPowerTom,dHiWoodBlock,dLowWoodBlock
+			nextenum	dHiHitDrum,dLowHitDrum,dMetalCrashHit,dEchoedClapHit
+			nextenum	dLowerEchoedClapHit,dHipHopHitKick,dHipHopHitPowerKick
+			nextenum	dBassHey,dDanceStyleKick,dHipHopHitKick2,dHipHopHitKick3
+			nextenum	dReverseFadingWind,dScratchS3,dLooseSnareNoise,dPowerKick2
+			nextenum	dCrashingNoiseWoo,dQuickHit,dKickHey,dPowerKickHit
+			nextenum	dLowPowerKickHit,dLowerPowerKickHit,dLowestPowerKickHit
+		elsecase;SonicDriverVer>=5
 			if (use_s3_samples<>0)||(use_sk_samples<>0)||(use_s3d_samples<>0)
 				enum		dSnareS3=$81,dHighTom,dMidTomS3,dLowTomS3,dFloorTomS3,dKickS3,dMuffledSnare
 				nextenum	dCrashCymbal,dRideCymbal,dLowMetalHit,dMetalHit,dHighMetalHit
@@ -297,7 +331,21 @@ smpsHeaderFM macro loc,pitch,vol
 smpsHeaderPSG macro loc,pitch,vol,mod,voice
 	CheckedChannelPointer loc
 	PSGPitchConvert pitch
-	dc.b	vol,mod,voice
+	dc.b	vol
+	; Frequency envelope
+	if (SonicDriverVer>=3) && (SourceDriver<3)
+		; In SMPS 68k Type 1, this byte is skipped and can contain garbage.
+		; Sonic 2's Oil Ocean Zone and Ending themes set this byte to a non-zero value which
+		; other drivers may try to process as valid data, so manually force it to 0 here.
+		dc.b	0
+	else
+		if (MOMPASS==2) && (SonicDriverVer<3) && (SourceDriver>=3) && (mod<>0)
+			message "This track header specifies a frequency envelope, but this driver does not support them."			
+		endif
+		dc.b	mod
+	endif
+	; Volume envelope
+	dc.b	voice
 	endm
 
 ; Header macros for SFX (not for music)
@@ -384,7 +432,7 @@ smpsChanTempoDiv macro val
 	if SonicDriverVer>=5
 		; New flag unique to Flamewing's modified S&K driver
 		dc.b	$FF,$08,val
-	elseif SonicDriverVer==3
+	elseif SonicDriverVer>=3
 		fatal "Coord. Flag to set tempo divider of a single channel does not exist in S3 driver. Use Flamewing's modified S&K sound driver instead."
 	else
 		dc.b	$E5,val

@@ -37,8 +37,9 @@ use_s3_samples			= 1
 ; Set the following to non-zero to use all S&K DAC samples,
 ; or to zero otherwise.
 use_sk_samples			= 1
-; special
-s3_dac_no_voice_samples	= 1
+
+dobby_mods				= 1
+s3_dac_no_voice_samples	= dobby_mods
 
 ; ---------------------------------------------------------------------------
 
@@ -449,8 +450,8 @@ SndID__First			= sfx_First
 		else
 			ifdef sfx__First
 SndID__First			= sfx__First
-				if sfx__First>1
-					message "You can gain more IDs for SFX by changing the the definition of the sfx__First constant to 1 (it is currently $\{sfx__First})"
+				if sfx__First>1 ; dobby: fixed single underscore
+					message "You can gain more IDs for SFX by changing the the definition of the sfx_First constant to 1 (it is currently $\{sfx__First})"
 				endif
 			endif
 		endif
@@ -1845,6 +1846,10 @@ zCycleMusicQueue:
 ; TypeCheck:
 ;sub_4FB
 zPlaySoundByIndex:
+		if (dobby_mods==0)
+		cp	MusID_SegaSound					; Is this the SEGA sound?
+		jp	z, zPlaySegaSound				; Branch if yes
+		endif
 		cp	MusID__End						; Is this a music?
 		jp	c, zPlayMusic					; Branch if yes
 		cp	FadeID__First					; Is it before the first fade effect?
@@ -2833,6 +2838,22 @@ zFMOperatorWriteLoop:
 		ret
 ; End of function zFMOperatorWriteLoop
 ; ---------------------------------------------------------------------------
+;loc_A16
+	if (dobby_mods==0)
+zPlaySegaSound:
+		call	zMusicFade					; Fade music before playing the sound
+		xor	a								; a = 0
+		ld	(zMusicNumber), a				; Clear M68K input queue...
+		ld	(zSFXNumber0), a				; ... including SFX slot 0...
+		ld	(zSFXNumber1), a				; ... and SFX slot 1
+		ld	(zSoundQueue0), a				; Also clear music queue entry 0...
+		ld	(zSoundQueue1), a				; ... and entry 1...
+		ld	(zSoundQueue2), a				; ... and entry 2
+		inc	a								; a = 1
+		ld	(PlaySegaPCMFlag), a			; Set flag to play SEGA sound
+		pop	hl								; Don't return to caller of zCycleSoundQueue
+		ret
+	endif
 
 ; =============== S U B	R O U T	I N E =======================================
 ; Performs massive restoration and starts fade in of previous music.
@@ -4313,6 +4334,11 @@ zPlayDigitalAudio:
 
 .dac_idle_loop:
 		ei									; Enable interrupts
+		if (dobby_mods==0)
+		ld	a, (PlaySegaPCMFlag)			; a = play SEGA PCM flag
+		or	a								; Is SEGA sound being played?
+		jp	nz, zPlaySEGAPCM				; Branch if yes
+		endif
 		ld	a, (zDACIndex)					; a = DAC index/flag
 		or	a								; Is DAC channel being used?
 		jr	z, .dac_idle_loop				; Loop if not
@@ -4412,6 +4438,55 @@ zPlayDigitalAudio:
 DecTable:
 		db	   0,  1,   2,   4,   8,  10h,  20h,  40h
 		db	 80h, -1,  -2,  -4,  -8, -10h, -20h, -40h
+; ---------------------------------------------------------------------------
+
+; =============== S U B	R O U T	I N E =======================================
+;
+; Plays the SEGA PCM sound. The z80 will be "stuck" in this function (as it
+; disables interrupts) until either of the following conditions hold:
+;
+;	(1)	The SEGA PCM is fully played
+;	(2)	The next song to play is 0FEh (MusID_StopSega)
+;loc_1126
+	if (dobby_mods==0)
+zPlaySEGAPCM:
+		di									; Disable interrupts
+		xor	a								; a = 0
+		ld	(PlaySegaPCMFlag), a			; Clear flag
+		ld	a, ymDACEnable					; DAC enable/disable register
+		ld	(zYM2612_A0), a					; Select the register
+		nop									; Delay
+		ld	a, maskDACEnable				; Value to enable DAC
+		ld	(zYM2612_D0), a					; Enable DAC
+		ld	a, zmake68kBank(SEGA_PCM)		; a = sound bank index
+		bankswitchLoop						; Bank switch to sound bank
+		ld	hl, zmake68kPtr(SEGA_PCM)		; hl = pointer to SEGA PCM
+		ld	de, SEGA_PCM_End-SEGA_PCM		; de = length of SEGA PCM
+		ld	a, ymDACPCM						; DAC channel register
+		ld	(zYM2612_A0), a					; Send to YM2612
+		nop									; Delay
+
+.loop:
+		ld	a, (hl)							; a = next byte of SEGA PCM
+		ld	(zYM2612_D0), a					; Send to DAC
+		ld	a, (zMusicNumber)				; Check next song number
+		cp	MusID_StopSega					; Is it the command to stop playing SEGA PCM?
+		jr	z, .done						; Break the loop if yes
+		nop
+		nop
+
+		ld	b, 0Ch							; Loop counter
+		djnz	$							; Loop in this instruction, decrementing b each iteration, until b = 0
+
+		inc	hl								; Advance to next byte of SEGA PCM
+		dec	de								; Mark one byte as being done
+		ld	a, d							; a = d
+		or	e								; Is length zero?
+		jr	nz, .loop						; Loop if not
+
+.done:
+		jp	zPlayDigitalAudio				; Go back to normal DAC code
+	endif
 ; ---------------------------------------------------------------------------
 ; ===========================================================================
 ; DAC BANKS
@@ -4661,7 +4736,61 @@ VolEnv_33:	db	0Eh, 0Dh, 0Ch, 0Bh, 0Ah,   9,   8,   7,   6,   5,   4,   3,   2,  
 ; MUSIC BANKS
 ; ===========================================================================
 z80_MusicBanks:
+	if (dobby_mods<>0)
 	db zmake68kBank(MusData_Default)
+	else
+	db zmake68kBank(MusData_AIZ1)
+	db zmake68kBank(MusData_AIZ2)
+	db zmake68kBank(MusData_HCZ1)
+	db zmake68kBank(MusData_HCZ2)
+	db zmake68kBank(MusData_MGZ1)
+	db zmake68kBank(MusData_MGZ2)
+	db zmake68kBank(MusData_CNZ1)
+	db zmake68kBank(MusData_CNZ2)
+	db zmake68kBank(MusData_FBZ1)
+	db zmake68kBank(MusData_FBZ2)
+	db zmake68kBank(MusData_ICZ1)
+	db zmake68kBank(MusData_ICZ2)
+	db zmake68kBank(MusData_LBZ1)
+	db zmake68kBank(MusData_LBZ2)
+	db zmake68kBank(MusData_MHZ1)
+	db zmake68kBank(MusData_MHZ2)
+	db zmake68kBank(MusData_SOZ1)
+	db zmake68kBank(MusData_SOZ2)
+	db zmake68kBank(MusData_LRZ1)
+	db zmake68kBank(MusData_LRZ2)
+	db zmake68kBank(MusData_SSZ)
+	db zmake68kBank(MusData_DEZ1)
+	db zmake68kBank(MusData_DEZ2)
+	db zmake68kBank(MusData_Minib_SK)
+	db zmake68kBank(MusData_Boss)
+	db zmake68kBank(MusData_DDZ)
+	db zmake68kBank(MusData_PachBonus)
+	db zmake68kBank(MusData_SpecialS)
+	db zmake68kBank(MusData_SlotBonus)
+	db zmake68kBank(MusData_GumBonus)
+	db zmake68kBank(MusData_Knux)
+	db zmake68kBank(MusData_ALZ)
+	db zmake68kBank(MusData_BPZ)
+	db zmake68kBank(MusData_DPZ)
+	db zmake68kBank(MusData_CGZ)
+	db zmake68kBank(MusData_EMZ)
+	db zmake68kBank(MusData_Title)
+	db zmake68kBank(MusData_S3Credits)
+	db zmake68kBank(MusData_GameOver)
+	db zmake68kBank(MusData_Continue)
+	db zmake68kBank(MusData_Results)
+	db zmake68kBank(MusData_1UP)
+	db zmake68kBank(MusData_Emerald)
+	db zmake68kBank(MusData_Invic)
+	db zmake68kBank(MusData_2PMenu)
+	db zmake68kBank(MusData_Minib_SK)
+	db zmake68kBank(MusData_Menu)
+	db zmake68kBank(MusData_FinalBoss)
+	db zmake68kBank(MusData_Drown)
+	db zmake68kBank(MusData_PresSega)
+	db zmake68kBank(MusData_SKCredits)
+	endif
 ; ---------------------------------------------------------------------------
 	if $ > z80_stack_top
 		fatal "Your Z80 tables won't fit before the z80 stack. It's \{$-z80_stack_top}h bytes past the start of the bottom of the stack, at \{z80_stack_top}h"
@@ -4694,7 +4823,7 @@ __LABEL__ label *
 	set	soundBankName,"__LABEL__"
 	endm
 
-DebugSoundbanks = 0
+DebugSoundbanks = dobby_mods-1
 
 finishBank macro
 	if * > soundBankStart + $8000
@@ -4863,7 +4992,61 @@ MusicPointers label *
 	elseif (MusicPointers&$7FFF)<>((*)&$7FFF)
 		fatal "Inconsistent placement of Music_Master_Table macro on bank"
 	endif
+	if (dobby_mods<>0)
 	declsong MusData_Default
+	else
+	declsong MusData_AIZ1
+	declsong MusData_AIZ2
+	declsong MusData_HCZ1
+	declsong MusData_HCZ2
+	declsong MusData_MGZ1
+	declsong MusData_MGZ2
+	declsong MusData_CNZ1
+	declsong MusData_CNZ2
+	declsong MusData_FBZ1
+	declsong MusData_FBZ2
+	declsong MusData_ICZ1
+	declsong MusData_ICZ2
+	declsong MusData_LBZ1
+	declsong MusData_LBZ2
+	declsong MusData_MHZ1
+	declsong MusData_MHZ2
+	declsong MusData_SOZ1
+	declsong MusData_SOZ2
+	declsong MusData_LRZ1
+	declsong MusData_LRZ2
+	declsong MusData_SSZ
+	declsong MusData_DEZ1
+	declsong MusData_DEZ2
+	declsong MusData_Minib_SK
+	declsong MusData_Boss
+	declsong MusData_DDZ
+	declsong MusData_PachBonus
+	declsong MusData_SpecialS
+	declsong MusData_SlotBonus
+	declsong MusData_GumBonus
+	declsong MusData_Knux
+	declsong MusData_ALZ
+	declsong MusData_BPZ
+	declsong MusData_DPZ
+	declsong MusData_CGZ
+	declsong MusData_EMZ
+	declsong MusData_Title
+	declsong MusData_S3Credits
+	declsong MusData_GameOver
+	declsong MusData_Continue
+	declsong MusData_Results
+	declsong MusData_1UP
+	declsong MusData_Emerald
+	declsong MusData_Invic
+	declsong MusData_2PMenu
+	declsong MusData_Minib_SK
+	declsong MusData_Menu
+	declsong MusData_FinalBoss
+	declsong MusData_Drown
+	declsong MusData_PresSega
+	declsong MusData_SKCredits
+	endif
 	ifndef zMusIDPtr__End
 zMusIDPtr__End label *
 	endif
@@ -4875,13 +5058,13 @@ zMusIDPtr__End label *
 ; DAC Banks
 ; ===========================================================================
 
+	if (use_s3_samples<>0)||(use_sk_samples<>0)||(use_s3d_samples<>0)
 ; ---------------------------------------------------------------------------
 ; DAC Bank 1
 ; ---------------------------------------------------------------------------
 DacBank1:			startBank
 	DAC_Master_Table
 
-	if (use_s3_samples<>0)||(use_sk_samples<>0)||(use_s3d_samples<>0)
 DAC_86_Data:			DACBINCLUDE "Sound/DAC/86.bin"
 DAC_81_Data:			DACBINCLUDE "Sound/DAC/81.bin"
 DAC_82_83_84_85_Data:	DACBINCLUDE "Sound/DAC/82-85.bin"
@@ -4905,8 +5088,6 @@ DAC_B2_B3_Data:			DACBINCLUDE "Sound/DAC/B2-B3.bin"
 DAC_D8_D9_Data:			DACBINCLUDE "Sound/DAC/D8-D9.bin"
 	endif
 
-	endif
-
 	finishBank
 
 ; ---------------------------------------------------------------------------
@@ -4914,6 +5095,7 @@ DAC_D8_D9_Data:			DACBINCLUDE "Sound/DAC/D8-D9.bin"
 ; ---------------------------------------------------------------------------
 DacBank2:			startBank
 	DAC_Master_Table
+	endif
 
 	if (use_s3_samples<>0)||(use_sk_samples<>0)||(use_s3d_samples<>0)
 DAC_9C_Data:			DACBINCLUDE "Sound/DAC/9C.bin"
@@ -5015,9 +5197,12 @@ DAC_D7_Data:			DACBINCLUDE "Sound/DAC/D7.bin"
 	endif
 
 ; ---------------------------------------------------------------------------
+	if (dobby_mods<>0)
 	include "Sound/Flamedriver/_smps2asm_inc.asm"
+	else
+	include "Sound/_smps2asm_inc.asm"
+	endif
 ; ---------------------------------------------------------------------------
-
 ; ===========================================================================
 ; Sound Bank
 ; ===========================================================================
@@ -5027,8 +5212,353 @@ SndBank:			startBank
 ; SFX Pointers
 ; ===========================================================================
 SFXPointers:
+	if (dobby_mods==0)
+Sound_33_Ptr:	offsetBankTableEntry.w Sound_33
+Sound_34_Ptr:	offsetBankTableEntry.w Sound_34
+Sound_35_Ptr:	offsetBankTableEntry.w Sound_35
+Sound_36_Ptr:	offsetBankTableEntry.w Sound_36
+Sound_37_Ptr:	offsetBankTableEntry.w Sound_37
+Sound_38_Ptr:	offsetBankTableEntry.w Sound_38
+Sound_39_Ptr:	offsetBankTableEntry.w Sound_39
+Sound_3A_Ptr:	offsetBankTableEntry.w Sound_3A
+Sound_3B_Ptr:	offsetBankTableEntry.w Sound_3B
+Sound_3C_Ptr:	offsetBankTableEntry.w Sound_3C
+Sound_3D_Ptr:	offsetBankTableEntry.w Sound_3D
+Sound_3E_Ptr:	offsetBankTableEntry.w Sound_3E
+Sound_3F_Ptr:	offsetBankTableEntry.w Sound_3F
+Sound_40_Ptr:	offsetBankTableEntry.w Sound_40
+Sound_41_Ptr:	offsetBankTableEntry.w Sound_41
+Sound_42_Ptr:	offsetBankTableEntry.w Sound_42
+Sound_43_Ptr:	offsetBankTableEntry.w Sound_43
+Sound_44_Ptr:	offsetBankTableEntry.w Sound_44
+Sound_45_Ptr:	offsetBankTableEntry.w Sound_45
+Sound_46_Ptr:	offsetBankTableEntry.w Sound_46
+Sound_47_Ptr:	offsetBankTableEntry.w Sound_47
+Sound_48_Ptr:	offsetBankTableEntry.w Sound_48
+Sound_49_Ptr:	offsetBankTableEntry.w Sound_49
+Sound_4A_Ptr:	offsetBankTableEntry.w Sound_4A
+Sound_4B_Ptr:	offsetBankTableEntry.w Sound_4B
+Sound_4C_Ptr:	offsetBankTableEntry.w Sound_4C
+Sound_4D_Ptr:	offsetBankTableEntry.w Sound_4D
+Sound_4E_Ptr:	offsetBankTableEntry.w Sound_4E
+Sound_4F_Ptr:	offsetBankTableEntry.w Sound_4F
+Sound_50_Ptr:	offsetBankTableEntry.w Sound_50
+Sound_51_Ptr:	offsetBankTableEntry.w Sound_51
+Sound_52_Ptr:	offsetBankTableEntry.w Sound_52
+Sound_53_Ptr:	offsetBankTableEntry.w Sound_53
+Sound_54_Ptr:	offsetBankTableEntry.w Sound_54
+Sound_55_Ptr:	offsetBankTableEntry.w Sound_55
+Sound_56_Ptr:	offsetBankTableEntry.w Sound_56
+Sound_57_Ptr:	offsetBankTableEntry.w Sound_57
+Sound_58_Ptr:	offsetBankTableEntry.w Sound_58
+Sound_59_Ptr:	offsetBankTableEntry.w Sound_59
+Sound_5A_Ptr:	offsetBankTableEntry.w Sound_5A
+Sound_5B_Ptr:	offsetBankTableEntry.w Sound_5B
+Sound_5C_Ptr:	offsetBankTableEntry.w Sound_5C
+Sound_5D_Ptr:	offsetBankTableEntry.w Sound_5D
+Sound_5E_Ptr:	offsetBankTableEntry.w Sound_5E
+Sound_5F_Ptr:	offsetBankTableEntry.w Sound_5F
+Sound_60_Ptr:	offsetBankTableEntry.w Sound_60
+Sound_61_Ptr:	offsetBankTableEntry.w Sound_61
+Sound_62_Ptr:	offsetBankTableEntry.w Sound_62
+Sound_63_Ptr:	offsetBankTableEntry.w Sound_63
+Sound_64_Ptr:	offsetBankTableEntry.w Sound_64
+Sound_65_Ptr:	offsetBankTableEntry.w Sound_65
+Sound_66_Ptr:	offsetBankTableEntry.w Sound_66
+Sound_67_Ptr:	offsetBankTableEntry.w Sound_67
+Sound_68_Ptr:	offsetBankTableEntry.w Sound_68
+Sound_69_Ptr:	offsetBankTableEntry.w Sound_69
+Sound_6A_Ptr:	offsetBankTableEntry.w Sound_6A
+Sound_6B_Ptr:	offsetBankTableEntry.w Sound_6B
+Sound_6C_Ptr:	offsetBankTableEntry.w Sound_6C
+Sound_6D_Ptr:	offsetBankTableEntry.w Sound_6D
+Sound_6E_Ptr:	offsetBankTableEntry.w Sound_6E
+Sound_6F_Ptr:	offsetBankTableEntry.w Sound_6F
+Sound_70_Ptr:	offsetBankTableEntry.w Sound_70
+Sound_71_Ptr:	offsetBankTableEntry.w Sound_71
+Sound_72_Ptr:	offsetBankTableEntry.w Sound_72
+Sound_73_Ptr:	offsetBankTableEntry.w Sound_73
+Sound_74_Ptr:	offsetBankTableEntry.w Sound_74
+Sound_75_Ptr:	offsetBankTableEntry.w Sound_75
+Sound_76_Ptr:	offsetBankTableEntry.w Sound_76
+Sound_77_Ptr:	offsetBankTableEntry.w Sound_77
+Sound_78_Ptr:	offsetBankTableEntry.w Sound_78
+Sound_79_Ptr:	offsetBankTableEntry.w Sound_79
+Sound_7A_Ptr:	offsetBankTableEntry.w Sound_7A
+Sound_7B_Ptr:	offsetBankTableEntry.w Sound_7B
+Sound_7C_Ptr:	offsetBankTableEntry.w Sound_7C
+Sound_7D_Ptr:	offsetBankTableEntry.w Sound_7D
+Sound_7E_Ptr:	offsetBankTableEntry.w Sound_7E
+Sound_7F_Ptr:	offsetBankTableEntry.w Sound_7F
+Sound_80_Ptr:	offsetBankTableEntry.w Sound_80
+Sound_81_Ptr:	offsetBankTableEntry.w Sound_81
+Sound_82_Ptr:	offsetBankTableEntry.w Sound_82
+Sound_83_Ptr:	offsetBankTableEntry.w Sound_83
+Sound_84_Ptr:	offsetBankTableEntry.w Sound_84
+Sound_85_Ptr:	offsetBankTableEntry.w Sound_85
+Sound_86_Ptr:	offsetBankTableEntry.w Sound_86
+Sound_87_Ptr:	offsetBankTableEntry.w Sound_87
+Sound_88_Ptr:	offsetBankTableEntry.w Sound_88
+Sound_89_Ptr:	offsetBankTableEntry.w Sound_89
+Sound_8A_Ptr:	offsetBankTableEntry.w Sound_8A
+Sound_8B_Ptr:	offsetBankTableEntry.w Sound_8B
+Sound_8C_Ptr:	offsetBankTableEntry.w Sound_8C
+Sound_8D_Ptr:	offsetBankTableEntry.w Sound_8D
+Sound_8E_Ptr:	offsetBankTableEntry.w Sound_8E
+Sound_8F_Ptr:	offsetBankTableEntry.w Sound_8F
+Sound_90_Ptr:	offsetBankTableEntry.w Sound_90
+Sound_91_Ptr:	offsetBankTableEntry.w Sound_91
+Sound_92_Ptr:	offsetBankTableEntry.w Sound_92
+Sound_93_Ptr:	offsetBankTableEntry.w Sound_93
+Sound_94_Ptr:	offsetBankTableEntry.w Sound_94
+Sound_95_Ptr:	offsetBankTableEntry.w Sound_95
+Sound_96_Ptr:	offsetBankTableEntry.w Sound_96
+Sound_97_Ptr:	offsetBankTableEntry.w Sound_97
+Sound_98_Ptr:	offsetBankTableEntry.w Sound_98
+Sound_99_Ptr:	offsetBankTableEntry.w Sound_99
+Sound_9A_Ptr:	offsetBankTableEntry.w Sound_9A
+Sound_9B_Ptr:	offsetBankTableEntry.w Sound_9B
+Sound_9C_Ptr:	offsetBankTableEntry.w Sound_9C
+Sound_9D_Ptr:	offsetBankTableEntry.w Sound_9D
+Sound_9E_Ptr:	offsetBankTableEntry.w Sound_9E
+Sound_9F_Ptr:	offsetBankTableEntry.w Sound_9F
+Sound_A0_Ptr:	offsetBankTableEntry.w Sound_A0
+Sound_A1_Ptr:	offsetBankTableEntry.w Sound_A1
+Sound_A2_Ptr:	offsetBankTableEntry.w Sound_A2
+Sound_A3_Ptr:	offsetBankTableEntry.w Sound_A3
+Sound_A4_Ptr:	offsetBankTableEntry.w Sound_A4
+Sound_A5_Ptr:	offsetBankTableEntry.w Sound_A5
+Sound_A6_Ptr:	offsetBankTableEntry.w Sound_A6
+Sound_A7_Ptr:	offsetBankTableEntry.w Sound_A7
+Sound_A8_Ptr:	offsetBankTableEntry.w Sound_A8
+Sound_A9_Ptr:	offsetBankTableEntry.w Sound_A9
+Sound_AA_Ptr:	offsetBankTableEntry.w Sound_AA
+Sound_AB_Ptr:	offsetBankTableEntry.w Sound_AB
+Sound_AC_Ptr:	offsetBankTableEntry.w Sound_AC
+Sound_AD_Ptr:	offsetBankTableEntry.w Sound_AD
+Sound_AE_Ptr:	offsetBankTableEntry.w Sound_AE
+Sound_AF_Ptr:	offsetBankTableEntry.w Sound_AF
+Sound_B0_Ptr:	offsetBankTableEntry.w Sound_B0
+Sound_B1_Ptr:	offsetBankTableEntry.w Sound_B1
+Sound_B2_Ptr:	offsetBankTableEntry.w Sound_B2
+Sound_B3_Ptr:	offsetBankTableEntry.w Sound_B3
+Sound_B4_Ptr:	offsetBankTableEntry.w Sound_B4
+Sound_B5_Ptr:	offsetBankTableEntry.w Sound_B5
+Sound_B6_Ptr:	offsetBankTableEntry.w Sound_B6
+Sound_B7_Ptr:	offsetBankTableEntry.w Sound_B7
+Sound_B8_Ptr:	offsetBankTableEntry.w Sound_B8
+Sound_B9_Ptr:	offsetBankTableEntry.w Sound_B9
+Sound_BA_Ptr:	offsetBankTableEntry.w Sound_BA
+Sound_BB_Ptr:	offsetBankTableEntry.w Sound_BB
+Sound_BC_Ptr:	offsetBankTableEntry.w Sound_BC
+Sound_BD_Ptr:	offsetBankTableEntry.w Sound_BD
+Sound_BE_Ptr:	offsetBankTableEntry.w Sound_BE
+Sound_BF_Ptr:	offsetBankTableEntry.w Sound_BF
+Sound_C0_Ptr:	offsetBankTableEntry.w Sound_C0
+Sound_C1_Ptr:	offsetBankTableEntry.w Sound_C1
+Sound_C2_Ptr:	offsetBankTableEntry.w Sound_C2
+Sound_C3_Ptr:	offsetBankTableEntry.w Sound_C3
+Sound_C4_Ptr:	offsetBankTableEntry.w Sound_C4
+Sound_C5_Ptr:	offsetBankTableEntry.w Sound_C5
+Sound_C6_Ptr:	offsetBankTableEntry.w Sound_C6
+Sound_C7_Ptr:	offsetBankTableEntry.w Sound_C7
+Sound_C8_Ptr:	offsetBankTableEntry.w Sound_C8
+Sound_C9_Ptr:	offsetBankTableEntry.w Sound_C9
+Sound_CA_Ptr:	offsetBankTableEntry.w Sound_CA
+Sound_CB_Ptr:	offsetBankTableEntry.w Sound_CB
+Sound_CC_Ptr:	offsetBankTableEntry.w Sound_CC
+Sound_CD_Ptr:	offsetBankTableEntry.w Sound_CD
+Sound_CE_Ptr:	offsetBankTableEntry.w Sound_CE
+Sound_CF_Ptr:	offsetBankTableEntry.w Sound_CF
+Sound_D0_Ptr:	offsetBankTableEntry.w Sound_D0
+Sound_D1_Ptr:	offsetBankTableEntry.w Sound_D1
+Sound_D2_Ptr:	offsetBankTableEntry.w Sound_D2
+Sound_D3_Ptr:	offsetBankTableEntry.w Sound_D3
+Sound_D4_Ptr:	offsetBankTableEntry.w Sound_D4
+Sound_D5_Ptr:	offsetBankTableEntry.w Sound_D5
+Sound_D6_Ptr:	offsetBankTableEntry.w Sound_D6
+Sound_D7_Ptr:	offsetBankTableEntry.w Sound_D7
+Sound_D8_Ptr:	offsetBankTableEntry.w Sound_D8
+Sound_D9_Ptr:	offsetBankTableEntry.w Sound_D9
+Sound_DA_Ptr:	offsetBankTableEntry.w Sound_DA
+Sound_DB_Ptr:	offsetBankTableEntry.w Sound_DB
+	endif
 Sound_End_Ptr
 ; ---------------------------------------------------------------------------
+	if (dobby_mods==0)
+SEGA_PCM:	binclude "Sound/Sega PCM.bin"
+SEGA_PCM_End
+		even
+Sound_33:	include "Sound/SFX/33.asm"
+Sound_34:	include "Sound/SFX/34.asm"
+Sound_35:	include "Sound/SFX/35.asm"
+Sound_36:	include "Sound/SFX/36.asm"
+Sound_37:	include "Sound/SFX/37.asm"
+Sound_38:	include "Sound/SFX/38.asm"
+Sound_39:	include "Sound/SFX/39.asm"
+Sound_3A:	include "Sound/SFX/3A.asm"
+Sound_3B:	include "Sound/SFX/3B.asm"
+Sound_3C:	include "Sound/SFX/3C.asm"
+Sound_3D:	include "Sound/SFX/3D.asm"
+Sound_3E:	include "Sound/SFX/3E.asm"
+Sound_3F:	include "Sound/SFX/3F.asm"
+Sound_40:	include "Sound/SFX/40.asm"
+Sound_41:	include "Sound/SFX/41.asm"
+Sound_42:	include "Sound/SFX/42.asm"
+Sound_43:	include "Sound/SFX/43.asm"
+Sound_44:	include "Sound/SFX/44.asm"
+Sound_45:	include "Sound/SFX/45.asm"
+Sound_46:	include "Sound/SFX/46.asm"
+Sound_47:	include "Sound/SFX/47.asm"
+Sound_48:	include "Sound/SFX/48.asm"
+Sound_49:	include "Sound/SFX/49.asm"
+Sound_4A:	include "Sound/SFX/4A.asm"
+Sound_4B:	include "Sound/SFX/4B.asm"
+Sound_4C:	include "Sound/SFX/4C.asm"
+Sound_4D:	include "Sound/SFX/4D.asm"
+Sound_4E:	include "Sound/SFX/4E.asm"
+Sound_4F:	include "Sound/SFX/4F.asm"
+Sound_50:	include "Sound/SFX/50.asm"
+Sound_51:	include "Sound/SFX/51.asm"
+Sound_52:	include "Sound/SFX/52.asm"
+Sound_53:	include "Sound/SFX/53.asm"
+Sound_54:	include "Sound/SFX/54.asm"
+Sound_55:	include "Sound/SFX/55.asm"
+Sound_56:	include "Sound/SFX/56.asm"
+Sound_57:	include "Sound/SFX/57.asm"
+Sound_58:	include "Sound/SFX/58.asm"
+Sound_59:	include "Sound/SFX/59.asm"
+Sound_5A:	include "Sound/SFX/5A.asm"
+Sound_5B:	include "Sound/SFX/5B.asm"
+Sound_5C:	include "Sound/SFX/5C.asm"
+Sound_5D:	include "Sound/SFX/5D.asm"
+Sound_5E:	include "Sound/SFX/5E.asm"
+Sound_5F:	include "Sound/SFX/5F.asm"
+Sound_60:	include "Sound/SFX/60.asm"
+Sound_61:	include "Sound/SFX/61.asm"
+Sound_62:	include "Sound/SFX/62.asm"
+Sound_63:	include "Sound/SFX/63.asm"
+Sound_64:	include "Sound/SFX/64.asm"
+Sound_65:	include "Sound/SFX/65.asm"
+Sound_66:	include "Sound/SFX/66.asm"
+Sound_67:	include "Sound/SFX/67.asm"
+Sound_68:	include "Sound/SFX/68.asm"
+Sound_69:	include "Sound/SFX/69.asm"
+Sound_6A:	include "Sound/SFX/6A.asm"
+Sound_6B:	include "Sound/SFX/6B.asm"
+Sound_6C:	include "Sound/SFX/6C.asm"
+Sound_6D:	include "Sound/SFX/6D.asm"
+Sound_6E:	include "Sound/SFX/6E.asm"
+Sound_6F:	include "Sound/SFX/6F.asm"
+Sound_70:	include "Sound/SFX/70.asm"
+Sound_71:	include "Sound/SFX/71.asm"
+Sound_72:	include "Sound/SFX/72.asm"
+Sound_73:	include "Sound/SFX/73.asm"
+Sound_74:	include "Sound/SFX/74.asm"
+Sound_75:	include "Sound/SFX/75.asm"
+Sound_76:	include "Sound/SFX/76.asm"
+Sound_77:	include "Sound/SFX/77.asm"
+Sound_78:	include "Sound/SFX/78.asm"
+Sound_79:	include "Sound/SFX/79.asm"
+Sound_7A:	include "Sound/SFX/7A.asm"
+Sound_7B:	include "Sound/SFX/7B.asm"
+Sound_7C:	include "Sound/SFX/7C.asm"
+Sound_7D:	include "Sound/SFX/7D.asm"
+Sound_7E:	include "Sound/SFX/7E.asm"
+Sound_7F:	include "Sound/SFX/7F.asm"
+Sound_80:	include "Sound/SFX/80.asm"
+Sound_81:	include "Sound/SFX/81.asm"
+Sound_82:	include "Sound/SFX/82.asm"
+Sound_83:	include "Sound/SFX/83.asm"
+Sound_84:	include "Sound/SFX/84.asm"
+Sound_85:	include "Sound/SFX/85.asm"
+Sound_86:	include "Sound/SFX/86.asm"
+Sound_87:	include "Sound/SFX/87.asm"
+Sound_88:	include "Sound/SFX/88.asm"
+Sound_89:	include "Sound/SFX/89.asm"
+Sound_8A:	include "Sound/SFX/8A.asm"
+Sound_8B:	include "Sound/SFX/8B.asm"
+Sound_8C:	include "Sound/SFX/8C.asm"
+Sound_8D:	include "Sound/SFX/8D.asm"
+Sound_8E:	include "Sound/SFX/8E.asm"
+Sound_8F:	include "Sound/SFX/8F.asm"
+Sound_90:	include "Sound/SFX/90.asm"
+Sound_91:	include "Sound/SFX/91.asm"
+Sound_92:	include "Sound/SFX/92.asm"
+Sound_93:	include "Sound/SFX/93.asm"
+Sound_94:	include "Sound/SFX/94.asm"
+Sound_95:	include "Sound/SFX/95.asm"
+Sound_96:	include "Sound/SFX/96.asm"
+Sound_97:	include "Sound/SFX/97.asm"
+Sound_98:	include "Sound/SFX/98.asm"
+Sound_99:	include "Sound/SFX/99.asm"
+Sound_9A:	include "Sound/SFX/9A.asm"
+Sound_9B:	include "Sound/SFX/9B.asm"
+Sound_9C:	include "Sound/SFX/9C.asm"
+Sound_9D:	include "Sound/SFX/9D.asm"
+Sound_9E:	include "Sound/SFX/9E.asm"
+Sound_9F:	include "Sound/SFX/9F.asm"
+Sound_A0:	include "Sound/SFX/A0.asm"
+Sound_A1:	include "Sound/SFX/A1.asm"
+Sound_A2:	include "Sound/SFX/A2.asm"
+Sound_A3:	include "Sound/SFX/A3.asm"
+Sound_A4:	include "Sound/SFX/A4.asm"
+Sound_A5:	include "Sound/SFX/A5.asm"
+Sound_A6:	include "Sound/SFX/A6.asm"
+Sound_A7:	include "Sound/SFX/A7.asm"
+Sound_A8:	include "Sound/SFX/A8.asm"
+Sound_A9:	include "Sound/SFX/A9.asm"
+Sound_AA:	include "Sound/SFX/AA.asm"
+Sound_AB:	include "Sound/SFX/AB.asm"
+Sound_AC:	include "Sound/SFX/AC.asm"
+Sound_AD:	include "Sound/SFX/AD.asm"
+Sound_AE:	include "Sound/SFX/AE.asm"
+Sound_AF:	include "Sound/SFX/AF.asm"
+Sound_B0:	include "Sound/SFX/B0.asm"
+Sound_B1:	include "Sound/SFX/B1.asm"
+Sound_B2:	include "Sound/SFX/B2.asm"
+Sound_B3:	include "Sound/SFX/B3.asm"
+Sound_B4:	include "Sound/SFX/B4.asm"
+Sound_B5:	include "Sound/SFX/B5.asm"
+Sound_B6:	include "Sound/SFX/B6.asm"
+Sound_B7:	include "Sound/SFX/B7.asm"
+Sound_B8:	include "Sound/SFX/B8.asm"
+Sound_B9:	include "Sound/SFX/B9.asm"
+Sound_BA:	include "Sound/SFX/BA.asm"
+Sound_BB:	include "Sound/SFX/BB.asm"
+Sound_BC:	include "Sound/SFX/BC.asm"
+Sound_BD:	include "Sound/SFX/BD.asm"
+Sound_BE:	include "Sound/SFX/BE.asm"
+Sound_BF:	include "Sound/SFX/BF.asm"
+Sound_C0:	include "Sound/SFX/C0.asm"
+Sound_C1:	include "Sound/SFX/C1.asm"
+Sound_C2:	include "Sound/SFX/C2.asm"
+Sound_C3:	include "Sound/SFX/C3.asm"
+Sound_C4:	include "Sound/SFX/C4.asm"
+Sound_C5:	include "Sound/SFX/C5.asm"
+Sound_C6:	include "Sound/SFX/C6.asm"
+Sound_C7:	include "Sound/SFX/C7.asm"
+Sound_C8:	include "Sound/SFX/C8.asm"
+Sound_C9:	include "Sound/SFX/C9.asm"
+Sound_CA:	include "Sound/SFX/CA.asm"
+Sound_CB:	include "Sound/SFX/CB.asm"
+Sound_CC:	include "Sound/SFX/CC.asm"
+Sound_CD:	include "Sound/SFX/CD.asm"
+Sound_CE:	include "Sound/SFX/CE.asm"
+Sound_CF:	include "Sound/SFX/CF.asm"
+Sound_D0:	include "Sound/SFX/D0.asm"
+Sound_D1:	include "Sound/SFX/D1.asm"
+Sound_D2:	include "Sound/SFX/D2.asm"
+Sound_D3:	include "Sound/SFX/D3.asm"
+Sound_D4:	include "Sound/SFX/D4.asm"
+Sound_D5:	include "Sound/SFX/D5.asm"
+Sound_D6:	include "Sound/SFX/D6.asm"
+Sound_D7:	include "Sound/SFX/D7.asm"
+Sound_D8:	include "Sound/SFX/D8.asm"
+Sound_D9:	include "Sound/SFX/D9.asm"
+Sound_DA:	include "Sound/SFX/DA.asm"
+Sound_DB:	include "Sound/SFX/DB.asm"
+	endif
 
 	finishBank
 
@@ -5040,8 +5570,92 @@ Sound_End_Ptr
 ; ---------------------------------------------------------------------------
 Mus_Bank1_Start:	startBank
 	Music_Master_Table
+	if (dobby_mods<>0)
 z80_UniVoiceBank:	include "Sound/Flamedriver/UniBank.asm"
-
-MusData_Default:			include	"Sound/Flamedriver/scratchpad.asm"
+MusData_Default:		include	"Sound/Flamedriver/scratchpad.asm"
+	else
+z80_UniVoiceBank:	include "Sound/UniBank.asm"
+MusData_FBZ1:			include	"Sound/Music/FBZ1.asm"
+MusData_FBZ2:			include	"Sound/Music/FBZ2.asm"
+MusData_MHZ1:			include	"Sound/Music/MHZ1.asm"
+MusData_MHZ2:			include	"Sound/Music/MHZ2.asm"
+MusData_SOZ1:			include	"Sound/Music/SOZ1.asm"
+MusData_SOZ2:			include	"Sound/Music/SOZ2.asm"
+MusData_LRZ1:			include	"Sound/Music/LRZ1.asm"
+MusData_LRZ2:			include	"Sound/Music/LRZ2.asm"
+MusData_SSZ:			include	"Sound/Music/SSZ.asm"
+MusData_DEZ1:			include	"Sound/Music/DEZ1.asm"
+MusData_DEZ2:			include	"Sound/Music/DEZ2.asm"
+MusData_Minib_SK:		include	"Sound/Music/Miniboss.asm"
+MusData_Boss:			include	"Sound/Music/Zone Boss.asm"
+MusData_DDZ:			include	"Sound/Music/DDZ.asm"
+MusData_PachBonus:		include	"Sound/Music/Pachinko.asm"
+MusData_SpecialS:		include	"Sound/Music/Special Stage.asm"
+MusData_SlotBonus:		include	"Sound/Music/Slots.asm"
+MusData_Knux:			include	"Sound/Music/Knuckles.asm"
+	endif
 
 	finishBank
+
+	if (dobby_mods==0)
+
+; ---------------------------------------------------------------------------
+; Music Bank 2
+; ---------------------------------------------------------------------------
+Mus_Bank2_Start:	startBank
+	Music_Master_Table
+					include "Sound/UniBank.asm"
+MusData_Title:			include	"Sound/Music/Title.asm"
+MusData_1UP:			include	"Sound/Music/1UP.asm"
+MusData_Emerald:		include	"Sound/Music/Chaos Emerald.asm"
+MusData_AIZ1:			include	"Sound/Music/AIZ1.asm"
+MusData_AIZ2:			include	"Sound/Music/AIZ2.asm"
+MusData_HCZ1:			include	"Sound/Music/HCZ1.asm"
+MusData_HCZ2:			include	"Sound/Music/HCZ2.asm"
+MusData_MGZ1:			include	"Sound/Music/MGZ1.asm"
+MusData_MGZ2:			include	"Sound/Music/MGZ2.asm"
+MusData_CNZ2:			include	"Sound/Music/CNZ2.asm"
+MusData_CNZ1:			include	"Sound/Music/CNZ1.asm"
+
+	finishBank
+
+; ---------------------------------------------------------------------------
+; Music Bank 3
+; ---------------------------------------------------------------------------
+Mus_Bank3_Start:	startBank
+	Music_Master_Table
+					include "Sound/UniBank.asm"
+MusData_ICZ2:			include	"Sound/Music/ICZ2.asm"
+MusData_ICZ1:			include	"Sound/Music/ICZ1.asm"
+MusData_LBZ2:			include	"Sound/Music/LBZ2.asm"
+MusData_LBZ1:			include	"Sound/Music/LBZ1.asm"
+MusData_SKCredits:		include	"Sound/Music/Credits.asm"
+MusData_GameOver:		include	"Sound/Music/Game Over.asm"
+MusData_Continue:		include	"Sound/Music/Continue.asm"
+MusData_Results:		include	"Sound/Music/Level Outro.asm"
+MusData_Invic:			include	"Sound/Music/Invincible.asm"
+MusData_Menu:			include	"Sound/Music/Menu.asm"
+MusData_FinalBoss:		include	"Sound/Music/Final Boss.asm"
+MusData_PresSega:		include	"Sound/Music/Game Complete.asm"
+
+	finishBank
+
+; ---------------------------------------------------------------------------
+; Music Bank 4
+; ---------------------------------------------------------------------------
+Mus_Bank4_Start:	startBank
+	Music_Master_Table
+					include "Sound/UniBank.asm"
+MusData_GumBonus:		include	"Sound/Music/Gum Ball Machine.asm"
+MusData_ALZ:			include	"Sound/Music/Azure Lake.asm"
+MusData_BPZ:			include	"Sound/Music/Balloon Park.asm"
+MusData_DPZ:			include	"Sound/Music/Desert Palace.asm"
+MusData_CGZ:			include	"Sound/Music/Chrome Gadget.asm"
+MusData_EMZ:			include	"Sound/Music/Endless Mine.asm"
+MusData_S3Credits:		include	"Sound/Music/Sonic 3 Credits.asm"
+MusData_2PMenu:			include	"Sound/Music/Competition Menu.asm"
+MusData_Drown:			include	"Sound/Music/Countdown.asm"
+
+	finishBank
+
+	endif
