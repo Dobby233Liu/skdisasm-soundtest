@@ -9,5 +9,6 @@ incspdat macro file,fileid
 
 	if (1==0)
 	else
-		incspdat	"Sound/Flamedriver/s3d/music-improved/The Final Fight.asm","s3d/music-improved/The Final Fight"
+		incspdat	"Sound/Flamedriver/sk/disasm/Menu (Sonic & Knuckles).asm",	"sk/disasm/Menu (Sonic & Knuckles)"
 	endif
+	;include "Sound/Flamedriver/sk/music-optimized/LBZ2.asm"

@@ -39,7 +39,8 @@ use_s3_samples			= 1
 use_sk_samples			= 1
 
 dobby_mods				= 1
-s3_dac_no_voice_samples	= dobby_mods
+s3_dac_no_voice_samples	= 0;dobby_mods
+FixMusicAndSFXDataBugs  = 1
 
 ; ---------------------------------------------------------------------------
 
@@ -4916,7 +4917,7 @@ DACPointers label *
 		DAC_Setup $0C,DAC_A9_Data
 		DAC_Setup $0A,DAC_AA_Data
 		if (s3_dac_no_voice_samples<>0)
-		DAC_Setup $0B,DAC_AB_Data
+		DAC_Setup $09,DAC_AB_Data
 		else
 		DAC_Setup $0D,DAC_AB_Data
 		endif

@@ -432,7 +432,7 @@ smpsChanTempoDiv macro val
 	if SonicDriverVer>=5
 		; New flag unique to Flamewing's modified S&K driver
 		dc.b	$FF,$08,val
-	elseif SonicDriverVer>=3
+	elseif SonicDriverVer==3
 		fatal "Coord. Flag to set tempo divider of a single channel does not exist in S3 driver. Use Flamewing's modified S&K sound driver instead."
 	else
 		dc.b	$E5,val
@@ -502,6 +502,15 @@ smpsSetVol macro val
 ; Works on all drivers
 smpsPSGAlterVol macro vol
 	dc.b	$EC,vol
+	endm
+
+smpsPSGAlterVolS2 macro vol
+	; Sonic 2's driver allows the FM command to be used on PSG channels, but others do not.
+	if SonicDriverVer==2
+		smpsAlterVol vol
+	else
+		smpsPSGAlterVol vol
+	endif
 	endm
 
 ; Clears pushing sound flag in S1
